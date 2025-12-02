@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../providers/app_provider.dart';
-import '../models/appointment_model.dart'; // Import do modelo
+import '../models/appointment_model.dart';
+import '../models/worker_model.dart'; // Import do modelo de trabalhador
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
@@ -15,9 +16,11 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
-  // Guardamos o objeto inteiro do serviço ou apenas nome/preço
   String? _selectedServiceName;
   double _selectedServicePrice = 0.0;
+
+  // NOVO: Variável para guardar o profissional selecionado
+  Worker? _selectedWorker;
 
   final List<String> _timeSlots = [
     "09:00", "09:30", "10:00", "10:30", "11:00",
@@ -32,24 +35,25 @@ class _BookingScreenState extends State<BookingScreen> {
   };
 
   void _confirmBooking() {
-    if (_selectedTime != null && _selectedServiceName != null) {
+    // Validação reforçada: Agora exige Worker também
+    if (_selectedTime != null && _selectedServiceName != null && _selectedWorker != null) {
       final provider = Provider.of<AppProvider>(context, listen: false);
 
-      // 1. Cria a marcação real
       final newAppointment = Appointment(
         id: DateTime.now().toString(),
-        clientName: "Cliente Atual", // Em produção, viria do Login
+        clientName: "Cliente Atual",
         serviceName: _selectedServiceName!,
         price: _selectedServicePrice,
         date: _selectedDate,
         time: _selectedTime!,
         shopId: provider.currentShop?.id ?? '1',
+        // NOVOS CAMPOS: Guardamos quem vai fazer o serviço
+        workerId: _selectedWorker!.id,
+        workerName: _selectedWorker!.name,
       );
 
-      // 2. Salva no Provider (Cérebro)
       provider.addAppointment(newAppointment);
 
-      // 3. Mostra sucesso
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -57,16 +61,16 @@ class _BookingScreenState extends State<BookingScreen> {
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Icon(Icons.check_circle, color: AppColors.gold, size: 50),
-          content: const Text(
-            "Marcação Confirmada!\nO barbeiro já recebeu o teu pedido.",
+          content: Text(
+            "Marcação Confirmada com ${_selectedWorker!.name}!\nO teu lugar está reservado.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(ctx); // Fecha dialog
-                Navigator.pop(context); // Volta à loja
+                Navigator.pop(ctx);
+                Navigator.pop(context);
               },
               child: const Text("OK", style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
             ),
@@ -75,14 +79,21 @@ class _BookingScreenState extends State<BookingScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor seleciona um serviço e um horário.')),
+        const SnackBar(
+          content: Text('Por favor escolhe um Profissional, Serviço e Horário.'),
+          backgroundColor: AppColors.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = Provider.of<AppProvider>(context).getThemeColor();
+    final provider = Provider.of<AppProvider>(context);
+    final themeColor = provider.getThemeColor();
+
+    // Obtém a lista de trabalhadores desta loja específica
+    final workers = provider.shopWorkers;
 
     return Scaffold(
       appBar: AppBar(
@@ -95,26 +106,72 @@ class _BookingScreenState extends State<BookingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle("Seleciona o Dia"),
+            // 1. SECÇÃO DE PROFISSIONAIS (NOVO)
+            _buildSectionTitle("Escolha um Profissional"),
             const SizedBox(height: 15),
 
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: themeColor.withOpacity(0.3)),
-              ),
-              child: CalendarDatePicker(
-                initialDate: _selectedDate,
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 30)),
-                onDateChanged: (date) => setState(() => _selectedDate = date),
+            SizedBox(
+              height: 110, // Altura para Avatar + Nome
+              child: workers.isEmpty
+                  ? const Center(child: Text("Sem profissionais disponíveis.", style: TextStyle(color: Colors.grey)))
+                  : ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: workers.length,
+                itemBuilder: (context, index) {
+                  final worker = workers[index];
+                  final isSelected = _selectedWorker?.id == worker.id;
+
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedWorker = worker),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 20),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(3), // Espaço para a borda
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? themeColor : Colors.transparent,
+                                width: 3,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: AppColors.surface,
+                              backgroundImage: NetworkImage(worker.photoUrl),
+                              onBackgroundImageError: (_, __) {}, // Ignora erros de imagem
+                              child: worker.photoUrl.isEmpty
+                                  ? const Icon(Icons.person, color: Colors.grey)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            worker.name.split(' ')[0], // Mostra só o primeiro nome
+                            style: TextStyle(
+                              color: isSelected ? themeColor : Colors.white,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            "⭐ ${worker.rating}",
+                            style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
 
-            const SizedBox(height: 30),
+            const Divider(color: Colors.white10, height: 40),
+
+            // 2. SECÇÃO DE SERVIÇOS
             _buildSectionTitle("Seleciona o Serviço"),
-            const SizedBox(height: 15),
+            const SizedBox(height: 10),
 
             ..._services.entries.map((entry) => RadioListTile<String>(
               activeColor: themeColor,
@@ -134,39 +191,53 @@ class _BookingScreenState extends State<BookingScreen> {
               }),
             )),
 
-            const SizedBox(height: 30),
-            _buildSectionTitle("Horário Disponível"),
+            const SizedBox(height: 20),
+
+            // 3. SECÇÃO DE DATA E HORA
+            _buildSectionTitle("Selecionar Data e Hora"),
             const SizedBox(height: 15),
 
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _timeSlots.map((time) {
-                final isSelected = _selectedTime == time;
-                return ChoiceChip(
-                  label: Text(
-                    time,
-                    style: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  selected: isSelected,
-                  selectedColor: themeColor,
-                  backgroundColor: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: isSelected ? themeColor : Colors.grey.withOpacity(0.3),
-                    ),
-                  ),
-                  onSelected: (selected) => setState(() => _selectedTime = selected ? time : null),
-                );
-              }).toList(),
+            // Calendário
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: themeColor.withOpacity(0.3)),
+              ),
+              child: CalendarDatePicker(
+                initialDate: _selectedDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 30)),
+                onDateChanged: (date) => setState(() => _selectedDate = date),
+              ),
             ),
 
-            const SizedBox(height: 50),
+            const SizedBox(height: 20),
+            const Text("Manhã", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 10),
+            _buildTimeGrid(_timeSlots.sublist(0, 5), themeColor),
 
+            const SizedBox(height: 15),
+            const Text("Tarde", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 10),
+            _buildTimeGrid(_timeSlots.sublist(5), themeColor),
+
+            const SizedBox(height: 40),
+
+            // RESUMO DO PREÇO
+            if (_selectedServicePrice > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Preço Total", style: TextStyle(color: Colors.white, fontSize: 18)),
+                    Text("${_selectedServicePrice.toStringAsFixed(2)}€", style: TextStyle(color: themeColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+
+            // BOTÃO CONFIRMAR
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -183,6 +254,35 @@ class _BookingScreenState extends State<BookingScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTimeGrid(List<String> times, Color themeColor) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: times.map((time) {
+        final isSelected = _selectedTime == time;
+        return ChoiceChip(
+          label: Text(
+            time,
+            style: TextStyle(
+              color: isSelected ? Colors.black : Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: themeColor,
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: isSelected ? themeColor : Colors.grey.withOpacity(0.3),
+            ),
+          ),
+          onSelected: (selected) => setState(() => _selectedTime = selected ? time : null),
+        );
+      }).toList(),
     );
   }
 

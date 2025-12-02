@@ -5,7 +5,9 @@ class Appointment {
   final double price;
   final DateTime date;
   final String time;
-  final String shopId; // Para saber a que loja pertence
+  final String shopId;
+  final String workerId; // <--- NOVO CAMPO
+  final String workerName; // <--- NOVO CAMPO (Para facilitar a exibição)
 
   Appointment({
     required this.id,
@@ -15,5 +17,7 @@ class Appointment {
     required this.date,
     required this.time,
     required this.shopId,
+    required this.workerId,     // Obrigatório
+    required this.workerName,   // Obrigatório
   });
 }
