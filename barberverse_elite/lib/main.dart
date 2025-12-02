@@ -15,6 +15,7 @@ import 'screens/loyalty_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/shop_edit_screen.dart';
 import 'screens/admin/service_manage_screen.dart';
+import 'screens/worker_dashboard.dart'; // Import novo
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,6 +58,7 @@ class BarberVerseApp extends StatelessWidget {
         '/admin_dashboard': (context) => const AdminDashboard(),
         '/shop_edit': (context) => const ShopEditScreen(),
         '/services_manage': (context) => const ServiceManageScreen(),
+        '/worker_dashboard': (context) => const WorkerDashboard(),
       },
     );
   }
