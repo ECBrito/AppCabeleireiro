@@ -15,57 +15,65 @@ class _LinkScreenState extends State<LinkScreen> {
   bool _loading = false;
 
   void _entrar(String code) async {
+    if (code.isEmpty) return;
     setState(() => _loading = true);
-    final success = await Provider.of<AppProvider>(context, listen: false).linkBusiness(code);
-    setState(() => _loading = false);
     
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Loja não encontrada! Tente: barber, ink, ou spa")));
+    // Tenta vincular à loja no Provider
+    // Se funcionar, o AppProvider avisa o main.dart e o ecrã muda sozinho!
+    final success = await Provider.of<AppProvider>(context, listen: false).linkBusiness(code);
+    
+    if (mounted) {
+      setState(() => _loading = false);
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Código inválido! Tente: barber"), backgroundColor: Colors.red)
+        );
+      }
+      // NOTA: Não fazemos Navigator.push aqui. O Consumer no main.dart faz isso.
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Padding(
         padding: const EdgeInsets.all(30),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("SkillHub", style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text("SkillHub.", style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white)).animate().fadeIn(),
             const SizedBox(height: 10),
-            const Text("A tua app universal.", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 50),
+            const Text("Insira o código do estabelecimento", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 40),
             
             TextField(
               controller: _controller,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: "Código da Loja",
                 hintText: "ex: barber",
+                filled: true, fillColor: const Color(0xFF1E1E1E),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.arrow_forward, color: Colors.white),
                   onPressed: () => _entrar(_controller.text),
                 ),
               ),
+              onSubmitted: _entrar,
             ),
-            
-            const SizedBox(height: 40),
-            const Text("Experimenta estes códigos:", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
+            // Atalhos rápidos para testar
             Wrap(
               spacing: 10,
               children: mockBusinesses.map((b) => ActionChip(
                 label: Text(b.code),
-                avatar: Icon(b.icon, size: 16, color: Color(b.colorHex)),
                 backgroundColor: const Color(0xFF1E1E1E),
                 labelStyle: const TextStyle(color: Colors.white),
                 onPressed: () => _entrar(b.code),
               )).toList(),
             ),
-            if (_loading) const Padding(padding: EdgeInsets.only(top:20), child: CircularProgressIndicator())
           ],
-        ).animate().fadeIn().slideY(begin: 0.1, end: 0),
+        ),
       ),
     );
   }

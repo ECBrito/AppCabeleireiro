@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb; // Importante
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -6,8 +6,9 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'config/theme.dart';
 import 'providers/app_provider.dart';
+import 'providers/auth_provider.dart';
 
-// Importa os ecrãs (Garante que estes ficheiros existem!)
+// Ecrãs Mobile
 import 'screens/link_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/login_screen.dart';
@@ -17,6 +18,8 @@ import 'screens/loyalty_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/shop_edit_screen.dart';
 import 'screens/admin/service_manage_screen.dart';
+
+// Ecrã Web
 import 'screens/web/landing_page_web.dart';
 
 void main() async {
@@ -26,7 +29,10 @@ void main() async {
 
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AppProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
       child: const SkillHubApp(),
     ),
   );
@@ -42,16 +48,17 @@ class SkillHubApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       
-      // Lógica Web vs Mobile
+      // AQUI ESTÁ A MAGIA:
+      // Se estiver no Browser (Chrome) -> Mostra a Landing Page
+      // Se estiver no Telemóvel -> Mostra o LinkScreen (código)
       home: kIsWeb 
           ? const LandingPageWeb() 
-          : const AppEntryPoint(),
+          : const LinkScreenWrapper(),
       
       routes: {
         '/login': (context) => const LoginScreen(),
         '/landing': (context) => const LandingPageWeb(),
-        // REMOVIDO O 'CONST' PARA EVITAR ERROS SE OS ECRÃS NÃO FOREM CONSTANTES
-        '/client_home': (context) => const MainShell(), 
+        '/client_home': (context) => const MainShell(),
         '/shop_details': (context) => const ShopScreen(),
         '/booking': (context) => const BookingScreen(),
         '/loyalty': (context) => const LoyaltyScreen(),
@@ -63,8 +70,9 @@ class SkillHubApp extends StatelessWidget {
   }
 }
 
-class AppEntryPoint extends StatelessWidget {
-  const AppEntryPoint({super.key});
+// Wrapper para decidir se mostra Link ou Loja no telemóvel
+class LinkScreenWrapper extends StatelessWidget {
+  const LinkScreenWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {

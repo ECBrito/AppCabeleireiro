@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class BookingScreen extends StatelessWidget {
+  const BookingScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(title: const Text("Login")), body: const Center(child: Text("Login Screen")));
+    return const Scaffold(body: Center(child: Text("Fazer Marcação")));
   }
 }
