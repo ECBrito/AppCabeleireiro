@@ -192,8 +192,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final actions = [
       {'title': 'Serviços', 'icon': Icons.content_cut, 'route': '/services_manage'},
       {'title': 'Clientes', 'icon': Icons.people, 'route': '/customers_manage'},
-      {'title': 'Promoções', 'icon': Icons.local_offer, 'route': null},
-      {'title': 'Relatórios', 'icon': Icons.bar_chart, 'route': null},
+      {'title': 'Promoções', 'icon': Icons.local_offer, 'route': '/promotions_manage'},
+      {'title': 'Relatórios', 'icon': Icons.bar_chart, 'route': '/reports'},
+      {'title': 'Horários', 'icon': Icons.access_time, 'route': '/schedule'},
+      {'title': 'Despesas', 'icon': Icons.attach_money, 'route': '/expenses'},
     ];
 
     return GridView.builder(

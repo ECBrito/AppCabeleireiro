@@ -10,10 +10,10 @@ import 'providers/auth_provider.dart';
 
 // Ecrãs Mobile
 import 'screens/link_screen.dart';
-import 'screens/main_shell.dart';
+import 'screens/client_home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/shop_screen.dart';
-import 'screens/booking_screen.dart';
+import 'screens/Appointments_Screen.dart';
 import 'screens/loyalty_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/shop_edit_screen.dart';
@@ -21,7 +21,11 @@ import 'screens/admin/service_manage_screen.dart';
 import 'screens/web/register_web.dart';
 import 'screens/admin/setup_wizard.dart';
 import 'screens/admin/customer_manage_screen.dart';
-
+import 'screens/admin/promotion_manage_screen.dart'; 
+import 'screens/admin/reports_screen.dart';
+import 'screens/admin/schedule_screen.dart';
+import 'screens/admin/expenses_screen.dart';
+import 'screens/booking_screen.dart';
 
 // Ecrã Web
 import 'screens/web/landing_page_web.dart';
@@ -62,7 +66,7 @@ class SkillHubApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/landing': (context) => const LandingPageWeb(),
-        '/client_home': (context) => const MainShell(),
+        '/client_home': (context) => const ClientHomeScreen(),
         '/shop_details': (context) => const ShopScreen(),
         '/booking': (context) => const BookingScreen(),
         '/loyalty': (context) => const LoyaltyScreen(),
@@ -72,6 +76,10 @@ class SkillHubApp extends StatelessWidget {
         '/register': (context) => const RegisterWeb(),
         '/setup_wizard': (context) => const SetupWizardScreen(),
         '/customers_manage': (context) => const CustomerManageScreen(),
+        '/promotions_manage': (context) => const PromotionManageScreen(),
+        '/reports': (context) => const ReportsScreen(),
+        '/schedule': (context) => const ScheduleScreen(),
+        '/expenses': (context) => const ExpensesScreen(),
       },
     );
   }
@@ -86,7 +94,7 @@ class LinkScreenWrapper extends StatelessWidget {
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
         if (provider.isLinked) {
-          return const MainShell();
+          return const ClientHomeScreen();
         } else {
           return const LinkScreen();
         }
