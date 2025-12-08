@@ -1,8 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:async';
-import 'dart:math' as math;
 import '../../config/theme.dart';
 
 class LandingPageWeb extends StatefulWidget {
@@ -13,16 +13,22 @@ class LandingPageWeb extends StatefulWidget {
 }
 
 class _LandingPageWebState extends State<LandingPageWeb> {
+  // Controladores para o Scroll Suave
   final ScrollController _scrollController = ScrollController();
-  double _scrollOffset = 0.0;
+  final GlobalKey _featuresKey = GlobalKey();
+  final GlobalKey _pricingKey = GlobalKey();
+  final GlobalKey _contactKey = GlobalKey();
 
-  @override
-  void initState() {
-    super.initState();
-    // Efeito Parallax simples: ouvir o scroll
-    _scrollController.addListener(() {
-      setState(() => _scrollOffset = _scrollController.offset);
-    });
+  // Função para fazer scroll até à secção
+  void _scrollTo(GlobalKey key) {
+    final context = key.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   @override
@@ -33,79 +39,98 @@ class _LandingPageWebState extends State<LandingPageWeb> {
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
-      // NAVBAR FLUTUANTE (GLASSMORPHISM)
+      
+      // NAVBAR FIXA
       appBar: PreferredSize(
         preferredSize: const Size(double.infinity, 80),
-        child: _GlassNavBar(isDesktop: isDesktop),
+        child: _GlassNavBar(
+          isDesktop: isDesktop,
+          onFeaturesTap: () => _scrollTo(_featuresKey),
+          onPricingTap: () => _scrollTo(_pricingKey),
+          onContactTap: () => _scrollTo(_contactKey),
+        ),
       ),
-      body: Stack(
-        children: [
-          // BACKGROUND ANIMADO (Aurora)
-          Positioned.fill(
-            child: const _AnimatedBackground(),
-          ),
+      
+      body: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          children: [
+            // 1. HERO (Capa)
+            _buildHeroSection(context, isDesktop),
+            
+            // 2. SOCIAL PROOF (Logos)
+            _buildTrustedBy(),
 
-          // CONTEÚDO COM SCROLL
-          SingleChildScrollView(
-            controller: _scrollController,
-            child: Column(
-              children: [
-                _buildHeroSection(context, isDesktop),
-                _buildStatsTicker(isDesktop),
-                _buildFeaturesSection(context, isDesktop),
-                _buildShowcaseSection(context, isDesktop),
-                _buildPricingSection(context, isDesktop),
-                _buildFooter(),
-              ],
-            ),
-          ),
-        ],
+            // 3. FUNCIONALIDADES
+            Container(key: _featuresKey), // Âncora
+            _buildFeaturesSection(context, isDesktop),
+
+            // 4. SHOWCASE (O Telemóvel)
+            _buildShowcaseSection(context, isDesktop),
+
+            // 5. PREÇOS
+            Container(key: _pricingKey), // Âncora
+            _buildPricingSection(context, isDesktop),
+
+            // 6. CONTACTO & FOOTER
+            Container(key: _contactKey), // Âncora
+            _buildContactAndFooter(context, isDesktop),
+          ],
+        ),
       ),
     );
   }
 
-  // --- SECÇÃO 1: HERO (O Impacto) ---
+  // --- SECÇÕES ---
+
   Widget _buildHeroSection(BuildContext context, bool isDesktop) {
     return Container(
       constraints: BoxConstraints(minHeight: isDesktop ? 900 : 700),
-      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 100 : 20, vertical: 120),
+      padding: EdgeInsets.fromLTRB(
+        isDesktop ? 100 : 20, 
+        150, // Padding top para compensar a Navbar
+        isDesktop ? 100 : 20, 
+        50
+      ),
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: NetworkImage("https://images.unsplash.com/photo-1634547985446-5c5675c93c4e?q=80&w=2000"),
+          fit: BoxFit.cover,
+          opacity: 0.2,
+        ),
+      ),
       child: Flex(
         direction: isDesktop ? Axis.horizontal : Axis.vertical,
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // TEXTO
           Expanded(
             flex: isDesktop ? 5 : 0,
             child: Column(
               crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
-                _AnimatedBadge(text: "NOVO: Versão Enterprise Disponível"),
+                _AnimatedBadge(text: "🚀 A Revolução do Agendamento"),
                 const SizedBox(height: 20),
                 Text(
-                  "A App que se\ntransforma no\nteu negócio.",
+                  "A Tua Barbearia.\nA Tua App.\nSem Código.",
                   textAlign: isDesktop ? TextAlign.start : TextAlign.center,
                   style: GoogleFonts.playfairDisplay(
                     fontSize: isDesktop ? 72 : 42,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     height: 1.1,
-                    shadows: [
-                      Shadow(color: AppColors.gold.withOpacity(0.5), blurRadius: 40, offset: const Offset(0, 0))
-                    ]
                   ),
                 ).animate().fadeIn(duration: 800.ms).slideY(begin: 0.2, end: 0),
                 
                 const SizedBox(height: 30),
                 Text(
-                  "Barbeiros. Tatuadores. Spas.\nCrie a sua aplicação móvel premium em minutos, sem código.",
+                  "A plataforma All-in-One para barbeiros, tatuadores e spas. Fideliza clientes e gere o teu negócio num só lugar.",
                   textAlign: isDesktop ? TextAlign.start : TextAlign.center,
                   style: GoogleFonts.lato(fontSize: 18, color: Colors.grey[400], height: 1.5),
-                ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
+                ).animate().fadeIn(delay: 200.ms),
                 
                 const SizedBox(height: 50),
                 
-                // BOTÕES DE AÇÃO
                 Wrap(
                   spacing: 20,
                   runSpacing: 20,
@@ -116,67 +141,49 @@ class _LandingPageWebState extends State<LandingPageWeb> {
                       onPressed: () => Navigator.pushNamed(context, '/login'),
                       isPrimary: true
                     ),
-                    _GlowButton(
-                      text: "VER DEMO", 
-                      onPressed: () {},
-                      isPrimary: false
-                    ),
                   ],
                 ).animate().fadeIn(delay: 400.ms).scale(),
               ],
             ),
           ),
-          
-          if (isDesktop) const SizedBox(width: 50),
+        ],
+      ),
+    );
+  }
 
-          // TELEMÓVEL 3D (MOCKUP ANIMADO)
-          Expanded(
-            flex: isDesktop ? 4 : 0,
-            child: const _ChameleonPhoneMockup()
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .moveY(begin: 0, end: -20, duration: 3.seconds, curve: Curves.easeInOut), // Efeito de levitação
+  Widget _buildTrustedBy() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      color: Colors.black,
+      child: Column(
+        children: [
+          Text("MAIS DE 500 NEGÓCIOS USAM SKILLHUB", style: TextStyle(color: Colors.grey[700], letterSpacing: 2, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.content_cut, color: Colors.grey[800], size: 40),
+              const SizedBox(width: 40),
+              Icon(Icons.brush, color: Colors.grey[800], size: 40),
+              const SizedBox(width: 40),
+              Icon(Icons.spa, color: Colors.grey[800], size: 40),
+              const SizedBox(width: 40),
+              Icon(Icons.fitness_center, color: Colors.grey[800], size: 40),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // --- SECÇÃO 2: NÚMEROS (Social Proof) ---
-  Widget _buildStatsTicker(bool isDesktop) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      decoration: BoxDecoration(
-        border: Border.symmetric(horizontal: BorderSide(color: Colors.white.withOpacity(0.1))),
-        color: Colors.black.withOpacity(0.5),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildStatItem("10k+", "Downloads"),
-          _buildStatItem("500+", "Negócios"),
-          _buildStatItem("4.9", "Avaliação Média"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String value, String label) {
-    return Column(
-      children: [
-        Text(value, style: GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.gold)),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5)),
-      ],
-    ).animate().fadeIn();
-  }
-
-  // --- SECÇÃO 3: FEATURES (Bento Grid) ---
   Widget _buildFeaturesSection(BuildContext context, bool isDesktop) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 20),
+      color: const Color(0xFF0F0F0F),
       child: Column(
         children: [
-          Text("Poder Ilimitado", style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, letterSpacing: 2)),
+          const Text("PORQUÊ NÓS?", style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, letterSpacing: 2)),
           const SizedBox(height: 10),
           Text("Tudo o que precisa para escalar.", style: GoogleFonts.playfairDisplay(fontSize: 40, color: Colors.white)),
           const SizedBox(height: 60),
@@ -197,62 +204,36 @@ class _LandingPageWebState extends State<LandingPageWeb> {
     );
   }
 
-  // --- SECÇÃO 4: SHOWCASE (Imagens grandes) ---
   Widget _buildShowcaseSection(BuildContext context, bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 100),
-      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 20),
+      color: Colors.black,
       child: Column(
         children: [
-          // Imagem grande com efeito de vidro
-          Container(
-            width: isDesktop ? 1000 : double.infinity,
-            height: 500,
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              image: const DecorationImage(
-                image: NetworkImage('https://images.unsplash.com/photo-1503951914875-452162b7f30a?q=80&w=1200'),
-                fit: BoxFit.cover,
-              ),
-              boxShadow: [BoxShadow(color: AppColors.gold.withOpacity(0.2), blurRadius: 50, spreadRadius: -10)],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.9), Colors.transparent],
-                ),
-              ),
-              padding: const EdgeInsets.all(40),
-              alignment: Alignment.bottomLeft,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("BarberVerse para Profissionais", style: GoogleFonts.playfairDisplay(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  const Text("Faça a gestão da sua equipa num único painel intuitivo.", style: TextStyle(color: Colors.white70, fontSize: 18)),
-                ],
-              ),
-            ),
+          Text("App do Cliente & Admin", style: GoogleFonts.playfairDisplay(fontSize: 32, color: Colors.white)),
+          const SizedBox(height: 40),
+          // Aqui poderias pôr imagens dos ecrãs lado a lado
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _MockupScreen(color: AppColors.gold, icon: Icons.content_cut),
+              if (isDesktop) const SizedBox(width: 40),
+              if (isDesktop) _MockupScreen(color: Colors.blue, icon: Icons.spa),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // --- SECÇÃO 5: PREÇOS ---
   Widget _buildPricingSection(BuildContext context, bool isDesktop) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 20),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.transparent, AppColors.surface],
+          colors: [Color(0xFF0F0F0F), Color(0xFF1E1E1E)],
         ),
       ),
       child: Column(
@@ -263,10 +244,10 @@ class _LandingPageWebState extends State<LandingPageWeb> {
             spacing: 30,
             runSpacing: 30,
             alignment: WrapAlignment.center,
-            children: [
-              _PricingCard(title: "Starter", price: "0€", features: const ["1 Profissional", "App Básica"], isPopular: false),
-              _PricingCard(title: "Pro", price: "29€", features: const ["5 Profissionais", "Personalização Total", "Sem anúncios"], isPopular: true),
-              _PricingCard(title: "Enterprise", price: "99€", features: const ["Lojas Ilimitadas", "API Dedicada", "Suporte 24/7"], isPopular: false),
+            children: const [
+              _PricingCard(title: "Starter", price: "0€", features: ["1 Profissional", "App Básica"], isPopular: false),
+              _PricingCard(title: "Pro", price: "29€", features: ["5 Profissionais", "Personalização Total", "Sem anúncios"], isPopular: true),
+              _PricingCard(title: "Enterprise", price: "99€", features: ["Lojas Ilimitadas", "API Dedicada", "Suporte 24/7"], isPopular: false),
             ],
           ),
         ],
@@ -274,39 +255,95 @@ class _LandingPageWebState extends State<LandingPageWeb> {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildContactAndFooter(BuildContext context, bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.all(50),
       color: Colors.black,
       child: Column(
         children: [
-          const Icon(Icons.content_cut, color: AppColors.gold, size: 40),
-          const SizedBox(height: 20),
-          Text("SkillHub", style: GoogleFonts.playfairDisplay(fontSize: 24, color: Colors.white)),
-          const SizedBox(height: 10),
-          const Text("Feito com ❤️ em Portugal.", style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 30),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text("Termos", style: TextStyle(color: Colors.grey)),
-              SizedBox(width: 20),
-              Text("Privacidade", style: TextStyle(color: Colors.grey)),
-              SizedBox(width: 20),
-              Text("Contacto", style: TextStyle(color: Colors.grey)),
-            ],
-          )
+          // CONTACT FORM
+          Container(
+            padding: const EdgeInsets.all(40),
+            margin: const EdgeInsets.all(20),
+            constraints: const BoxConstraints(maxWidth: 800),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Column(
+              children: [
+                Text("Dúvidas? Fale Connosco.", style: GoogleFonts.playfairDisplay(fontSize: 28, color: Colors.white)),
+                const SizedBox(height: 30),
+                const TextField(
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(hintText: "O seu email", filled: true, fillColor: Colors.black),
+                ),
+                const SizedBox(height: 15),
+                const TextField(
+                  maxLines: 3,
+                  style: TextStyle(color: Colors.white),
+                  decoration: InputDecoration(hintText: "A sua mensagem", filled: true, fillColor: Colors.black),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mensagem enviada!")));
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold, foregroundColor: Colors.black, padding: const EdgeInsets.all(20)),
+                    child: const Text("ENVIAR MENSAGEM"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // FOOTER
+          Container(
+            padding: const EdgeInsets.all(50),
+            decoration: BoxDecoration(
+              border: const Border(top: BorderSide(color: Colors.white10)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.content_cut, color: AppColors.gold, size: 40),
+                const SizedBox(height: 20),
+                Text("SkillHub", style: GoogleFonts.playfairDisplay(fontSize: 24, color: Colors.white)),
+                const SizedBox(height: 10),
+                const Text("Feito com ❤️ em Portugal.", style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(onPressed: (){}, child: const Text("Termos", style: TextStyle(color: Colors.grey))),
+                    const SizedBox(width: 20),
+                    TextButton(onPressed: (){}, child: const Text("Privacidade", style: TextStyle(color: Colors.grey))),
+                  ],
+                )
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// --- WIDGETS AUXILIARES (COMPONENTES) ---
+// --- COMPONENTES VISUAIS ---
 
 class _GlassNavBar extends StatelessWidget {
   final bool isDesktop;
-  const _GlassNavBar({required this.isDesktop});
+  final VoidCallback onFeaturesTap;
+  final VoidCallback onPricingTap;
+  final VoidCallback onContactTap;
+
+  const _GlassNavBar({
+    required this.isDesktop,
+    required this.onFeaturesTap,
+    required this.onPricingTap,
+    required this.onContactTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -314,7 +351,7 @@ class _GlassNavBar extends StatelessWidget {
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7), // Efeito Vidro
+        color: Colors.black.withOpacity(0.8),
         borderRadius: BorderRadius.circular(50),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
@@ -332,8 +369,9 @@ class _GlassNavBar extends StatelessWidget {
           if (isDesktop)
             Row(
               children: [
-                _NavButton("Funcionalidades"),
-                _NavButton("Preços"),
+                TextButton(onPressed: onFeaturesTap, child: const Text("Funcionalidades", style: TextStyle(color: Colors.white))),
+                TextButton(onPressed: onPricingTap, child: const Text("Preços", style: TextStyle(color: Colors.white))),
+                TextButton(onPressed: onContactTap, child: const Text("Contacto", style: TextStyle(color: Colors.white))),
                 const SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: () => Navigator.pushNamed(context, '/login'),
@@ -348,19 +386,6 @@ class _GlassNavBar extends StatelessWidget {
   }
 }
 
-class _NavButton extends StatelessWidget {
-  final String text;
-  const _NavButton(this.text);
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: () {},
-      child: Text(text, style: const TextStyle(color: Colors.white)),
-    );
-  }
-}
-
-// Botão com Brilho
 class _GlowButton extends StatefulWidget {
   final String text;
   final VoidCallback onPressed;
@@ -486,11 +511,11 @@ class _PricingCardState extends State<_PricingCard> {
         duration: const Duration(milliseconds: 300),
         width: 320,
         padding: const EdgeInsets.all(40),
+        transform: _isHovered ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
         decoration: BoxDecoration(
           color: widget.isPopular ? Colors.white : const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(30),
           border: Border.all(color: _isHovered ? AppColors.gold : Colors.transparent, width: 2),
-          transform: _isHovered ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
           boxShadow: _isHovered 
               ? [BoxShadow(color: AppColors.gold.withOpacity(0.2), blurRadius: 30, spreadRadius: 5)] 
               : [],
@@ -515,7 +540,7 @@ class _PricingCardState extends State<_PricingCard> {
                 children: [
                   Icon(Icons.check_circle, color: widget.isPopular ? Colors.green : AppColors.gold, size: 20),
                   const SizedBox(width: 10),
-                  Text(f, style: TextStyle(color: widget.isPopular ? Colors.black87 : Colors.white70)),
+                  Expanded(child: Text(f, style: TextStyle(color: widget.isPopular ? Colors.black87 : Colors.white70))),
                 ],
               ),
             )),
@@ -539,10 +564,8 @@ class _PricingCardState extends State<_PricingCard> {
   }
 }
 
-// --- TELEMÓVEL 3D QUE MUDA DE COR (O CAMALEÃO) ---
 class _ChameleonPhoneMockup extends StatefulWidget {
   const _ChameleonPhoneMockup();
-
   @override
   State<_ChameleonPhoneMockup> createState() => _ChameleonPhoneMockupState();
 }
@@ -550,133 +573,54 @@ class _ChameleonPhoneMockup extends StatefulWidget {
 class _ChameleonPhoneMockupState extends State<_ChameleonPhoneMockup> {
   int _index = 0;
   final List<Color> _colors = [AppColors.gold, const Color(0xFF00BFFF), const Color(0xFFE91E63)];
-  final List<String> _names = ["Barber King", "Zen Spa", "Ink Master"];
   final List<IconData> _icons = [Icons.content_cut, Icons.spa, Icons.brush];
-
   @override
   void initState() {
     super.initState();
-    // Ciclo automático a cada 3 segundos
     Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (mounted) {
-        setState(() => _index = (_index + 1) % _colors.length);
-      }
+      if (mounted) setState(() => _index = (_index + 1) % _colors.length);
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final color = _colors[_index];
-    final name = _names[_index];
     final icon = _icons[_index];
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 800),
-      width: 300,
-      height: 600,
+      width: 300, height: 600,
       decoration: BoxDecoration(
         color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: const Color(0xFF333333), width: 8),
-        boxShadow: [
-          BoxShadow(color: color.withOpacity(0.3), blurRadius: 50, spreadRadius: 10),
-        ],
+        boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 50, spreadRadius: 10)],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
-        child: Column(
-          children: [
-            // StatusBar Fake
-            Container(height: 30, color: Colors.black, child: const Row(mainAxisAlignment: MainAxisAlignment.end, children: [Icon(Icons.battery_full, color: Colors.white, size: 14), SizedBox(width: 15)])),
-            
-            // App Header
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 800),
-              padding: const EdgeInsets.all(20),
-              color: color.withOpacity(0.1),
-              child: Row(
-                children: [
-                  Icon(icon, color: color, size: 28),
-                  const SizedBox(width: 10),
-                  Text(name, style: GoogleFonts.playfairDisplay(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            
-            // Conteúdo Simulado da App
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    // Cartão Fidelidade
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 800),
-                      height: 150,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [color, color.withOpacity(0.6)]),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Center(child: Icon(Icons.qr_code, size: 50, color: Colors.black26)),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        _buildMockBtn(color),
-                        const SizedBox(width: 10),
-                        _buildMockBtn(Colors.white10),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMockBtn(Color color) {
-    return Expanded(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 800),
-        height: 60,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
-      ),
+      child: Center(child: Icon(icon, size: 80, color: color)),
     );
   }
 }
 
-// --- BACKGROUND COM GRADIENTE ANIMADO ---
-class _AnimatedBackground extends StatefulWidget {
-  const _AnimatedBackground();
-  @override
-  State<_AnimatedBackground> createState() => _AnimatedBackgroundState();
-}
-
-class _AnimatedBackgroundState extends State<_AnimatedBackground> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat(reverse: true);
-
+class _MockupScreen extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  const _MockupScreen({required this.color, required this.icon});
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF0A0A0A),
-                Color.lerp(const Color(0xFF0A0A0A), const Color(0xFF1A1A1A), _controller.value)!,
-              ],
-            ),
-          ),
-        );
-      },
+    return Container(
+      width: 200, height: 400,
+      decoration: BoxDecoration(
+        color: const Color(0xFF121212),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Center(child: Icon(icon, size: 50, color: color)),
     );
+  }
+}
+
+class _AnimatedBackground extends StatelessWidget {
+  const _AnimatedBackground();
+  @override
+  Widget build(BuildContext context) {
+    return Container(color: Colors.black);
   }
 }

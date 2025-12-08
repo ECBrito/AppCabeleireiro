@@ -18,6 +18,10 @@ import 'screens/loyalty_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/shop_edit_screen.dart';
 import 'screens/admin/service_manage_screen.dart';
+import 'screens/web/register_web.dart';
+import 'screens/admin/setup_wizard.dart';
+import 'screens/admin/customer_manage_screen.dart';
+
 
 // Ecrã Web
 import 'screens/web/landing_page_web.dart';
@@ -65,6 +69,9 @@ class SkillHubApp extends StatelessWidget {
         '/admin_dashboard': (context) => const AdminDashboard(),
         '/shop_edit': (context) => const ShopEditScreen(),
         '/services_manage': (context) => const ServiceManageScreen(),
+        '/register': (context) => const RegisterWeb(),
+        '/setup_wizard': (context) => const SetupWizardScreen(),
+        '/customers_manage': (context) => const CustomerManageScreen(),
       },
     );
   }
