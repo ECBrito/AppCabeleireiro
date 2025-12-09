@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/appointment_model.dart';
+import '../config/theme.dart';
 
 class AppointmentsScreen extends StatelessWidget {
   const AppointmentsScreen({super.key});
@@ -15,8 +16,8 @@ class AppointmentsScreen extends StatelessWidget {
     
     // Separar Futuro e Passado
     final now = DateTime.now();
-    final upcoming = allAppointments.where((a) => a.date.isAfter(now.subtract(const Duration(days: 1))) && a.status != AppointmentStatus.cancelled).toList();
-    final history = allAppointments.where((a) => a.date.isBefore(now.subtract(const Duration(days: 1))) || a.status == AppointmentStatus.completed || a.status == AppointmentStatus.cancelled).toList();
+    final upcoming = allAppointments.where((a) => a.date.isAfter(now.subtract(const Duration(hours: 1)))).toList();
+    final history = allAppointments.where((a) => a.date.isBefore(now.subtract(const Duration(hours: 1)))).toList();
 
     return DefaultTabController(
       length: 2,
@@ -26,9 +27,10 @@ class AppointmentsScreen extends StatelessWidget {
           title: const Text("A Minha Agenda"),
           backgroundColor: const Color(0xFF121212),
           centerTitle: false,
+          automaticallyImplyLeading: false,
           bottom: const TabBar(
-            indicatorColor: Color(0xFFFFD700),
-            labelColor: Color(0xFFFFD700),
+            indicatorColor: AppColors.gold,
+            labelColor: AppColors.gold,
             unselectedLabelColor: Colors.grey,
             tabs: [
               Tab(text: "PRÓXIMOS"),
@@ -38,15 +40,15 @@ class AppointmentsScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _buildList(upcoming, true),
-            _buildList(history, false),
+            _buildList(context, upcoming, true),
+            _buildList(context, history, false),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildList(List<Appointment> list, bool isUpcoming) {
+  Widget _buildList(BuildContext context, List<Appointment> list, bool isUpcoming) {
     if (list.isEmpty) {
       return Center(
         child: Column(
@@ -54,10 +56,7 @@ class AppointmentsScreen extends StatelessWidget {
           children: [
             Icon(isUpcoming ? Icons.calendar_today : Icons.history, size: 60, color: Colors.grey[800]),
             const SizedBox(height: 20),
-            Text(
-              isUpcoming ? "Sem marcações agendadas." : "Sem histórico.",
-              style: const TextStyle(color: Colors.grey),
-            ),
+            Text(isUpcoming ? "Sem marcações agendadas." : "Sem histórico.", style: const TextStyle(color: Colors.grey)),
           ],
         ),
       );
@@ -76,33 +75,13 @@ class AppointmentsScreen extends StatelessWidget {
             color: const Color(0xFF1E1E1E),
             borderRadius: BorderRadius.circular(16),
             border: Border(left: BorderSide(color: cardColor, width: 4)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0,4))
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0,4))],
           ),
           child: Column(
             children: [
               ListTile(
                 contentPadding: const EdgeInsets.all(16),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(appt.serviceName, style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 14)),
-                    // ETIQUETA DE STATUS
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: appt.statusColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: appt.statusColor.withOpacity(0.5)),
-                      ),
-                      child: Text(
-                        appt.statusText.toUpperCase(),
-                        style: TextStyle(color: appt.statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
+                title: Text(appt.serviceName, style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 14)),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -113,37 +92,73 @@ class AppointmentsScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.calendar_month, size: 14, color: Colors.grey[400]),
+                        Icon(Icons.access_time, size: 14, color: Colors.grey[400]),
                         const SizedBox(width: 5),
-                        Text(
-                          "${DateFormat('dd/MM').format(appt.date)} às ${appt.time}",
-                          style: TextStyle(color: Colors.grey[400]),
-                        ),
+                        Text("${DateFormat('dd/MM').format(appt.date)} • ${appt.time}", style: TextStyle(color: Colors.grey[400])),
                       ],
                     ),
                   ],
                 ),
-                trailing: Text(
-                  "${appt.price}€",
-                  style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+                trailing: Text("${appt.price}€", style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 16)),
               ),
-              // Botão Cancelar (Só se for futuro e não cancelado)
-              if (isUpcoming && appt.status == AppointmentStatus.pending)
+              
+              // BOTÃO DE AVALIAR (Apenas no Histórico)
+              if (!isUpcoming)
                  Container(
                    width: double.infinity,
-                   decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white10))),
-                   child: TextButton(
-                     onPressed: () {
-                       // Aqui chamarias provider.cancelAppointment(appt.id)
-                     },
-                     child: const Text("CANCELAR", style: TextStyle(color: Colors.red)),
+                   decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
+                   child: TextButton.icon(
+                     onPressed: () => _showReviewDialog(context, appt),
+                     icon: const Icon(Icons.star, color: AppColors.gold, size: 18),
+                     label: const Text("AVALIAR EXPERIÊNCIA", style: TextStyle(color: AppColors.gold)),
                    ),
                  )
             ],
           ),
         ).animate().fadeIn(delay: (100 * index).ms).slideY(begin: 0.1, end: 0);
       },
+    );
+  }
+
+  void _showReviewDialog(BuildContext context, Appointment appt) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text("Avaliar Serviço", style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Como foi o teu corte?", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (index) => const Icon(Icons.star, color: AppColors.gold, size: 30)),
+            ),
+            const SizedBox(height: 20),
+            const TextField(
+              style: TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Escreve um comentário...",
+                hintStyle: TextStyle(color: Colors.grey),
+                filled: true, fillColor: Colors.black26,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Obrigado pela avaliação! ⭐")));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
+            child: const Text("ENVIAR", style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
     );
   }
 }
