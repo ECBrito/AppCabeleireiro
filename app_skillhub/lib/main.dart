@@ -1,3 +1,5 @@
+import 'package:app_skillhub/screens/admin/workers_manage_screen.dart';
+import 'package:app_skillhub/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -80,7 +82,7 @@ class SkillHubApp extends StatelessWidget {
 
       routes: {
         '/login': (context) => const LoginScreen(),
-
+        '/register': (context) => const RegisterScreen(),
         // Rota do Cliente (Abre a Shell com a Lista de Lojas)
         '/client_home': (context) => const ClientHomeScreen(),
 
@@ -90,6 +92,7 @@ class SkillHubApp extends StatelessWidget {
         '/admin_dashboard': (context) => const AdminDashboard(),
         '/shop_edit': (context) => const ShopEditScreen(),
         '/services_manage': (context) => const ServiceManageScreen(),
+        '/workers_manage': (context) => const WorkersManageScreen(),
       },
     );
   }

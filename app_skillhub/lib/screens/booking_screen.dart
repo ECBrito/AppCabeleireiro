@@ -8,6 +8,7 @@ import '../models/service_model.dart';
 import '../models/worker_model.dart';
 import '../services/service_db_service.dart';
 import '../services/booking_db_service.dart';
+import '../services/worker_db_service.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
@@ -26,6 +27,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   final ServiceDbService _serviceDb = ServiceDbService();
   final BookingDbService _bookingDb = BookingDbService();
+  final WorkerDbService _workerDb = WorkerDbService();
 
   final List<String> _timeSlots = [
     "09:00", "09:30", "10:00", "10:30", "11:00",
@@ -115,7 +117,6 @@ class _BookingScreenState extends State<BookingScreen> {
     final provider = Provider.of<AppProvider>(context);
     final biz = provider.activeBusiness;
     final color = provider.getThemeColor();
-    final workers = provider.shopWorkers;
 
     if (biz == null) return const SizedBox();
 
@@ -132,63 +133,84 @@ class _BookingScreenState extends State<BookingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. ESCOLHER PROFISSIONAL ---
+            // --- 1. ESCOLHER PROFISSIONAL (STREAM FIRESTORE REAL) ---
             _buildSectionTitle("Com quem queres marcar?", color),
             const SizedBox(height: 15),
 
-            SizedBox(
-              height: 120,
-              child: workers.isEmpty
-                  ? const Center(child: Text("Nenhum profissional disponível.", style: TextStyle(color: Colors.grey)))
-                  : ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: workers.length,
-                itemBuilder: (context, index) {
-                  final worker = workers[index];
-                  final isSelected = _selectedWorker?.id == worker.id;
+            StreamBuilder<List<Worker>>(
+              stream: _workerDb.getWorkersStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: color));
+                }
 
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedWorker = worker),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 20),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected ? color : Colors.transparent,
-                                width: 3,
-                              ),
-                              boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 10)] : [],
-                            ),
-                            child: CircleAvatar(
-                              radius: 35,
-                              backgroundColor: AppColors.surface,
-                              backgroundImage: NetworkImage(worker.photoUrl),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            worker.name.split(' ')[0],
-                            style: TextStyle(
-                              color: isSelected ? color : Colors.white,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              const Icon(Icons.star, size: 12, color: Colors.amber),
-                              Text(" ${worker.rating}", style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                            ],
-                          )
-                        ],
-                      ),
+                final workers = snapshot.data ?? [];
+
+                if (workers.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      "Nenhum profissional disponível de momento.",
+                      style: TextStyle(color: Colors.grey),
                     ),
                   );
-                },
-              ),
+                }
+
+                return SizedBox(
+                  height: 140,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: workers.length,
+                    itemBuilder: (context, index) {
+                      final worker = workers[index];
+                      final isSelected = _selectedWorker?.id == worker.id;
+
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedWorker = worker),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 20),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected ? color : Colors.transparent,
+                                    width: 3,
+                                  ),
+                                  boxShadow: isSelected
+                                      ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 10)]
+                                      : [],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 35,
+                                  backgroundColor: AppColors.surface,
+                                  backgroundImage: NetworkImage(worker.photoUrl),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                worker.name.split(' ')[0],
+                                style: TextStyle(
+                                  color: isSelected ? color : Colors.white,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, size: 12, color: Colors.amber),
+                                  Text(" ${worker.rating}", style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                ],
+                              )
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
 
             const Divider(color: Colors.white10, height: 40),

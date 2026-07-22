@@ -211,6 +211,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildQuickActionsGrid(BuildContext context, Color color) {
     final actions = [
       {'title': 'Serviços', 'icon': Icons.content_cut, 'route': '/services_manage'},
+      {'title': 'Equipa', 'icon': Icons.people, 'route': '/workers_manage'},
       {'title': 'Clientes', 'icon': Icons.people, 'route': '/customers_manage'},
       {'title': 'Promoções', 'icon': Icons.local_offer, 'route': '/promotions_manage'},
       {'title': 'Relatórios', 'icon': Icons.bar_chart, 'route': '/reports'},
