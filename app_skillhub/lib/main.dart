@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart'; // Import do Firebase Core
+import 'firebase_options.dart';
 
 import 'config/theme.dart';
 import 'providers/app_provider.dart';
@@ -19,6 +21,12 @@ import 'screens/admin/service_manage_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa o Firebase com as opções geradas
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await Hive.initFlutter();
   await initializeDateFormatting();
 
@@ -43,8 +51,32 @@ class SkillHubApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
 
-      // MUDANÇA: Começa sempre pelo Login (ou verifica token no futuro)
-      home: const LoginScreen(),
+      // Verifica automaticamente a sessão atual do utilizador
+      home: Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          // Mostra um indicador de carregamento enquanto verifica o estado da sessão
+          if (auth.isLoading) {
+            return const Scaffold(
+              backgroundColor: Colors.black,
+              body: Center(
+                child: CircularProgressIndicator(color: AppColors.gold),
+              ),
+            );
+          }
+
+          // Se já estiver com sessão iniciada, redireciona pelo role
+          if (auth.isLoggedIn) {
+            if (auth.isOwner) {
+              return const AdminDashboard();
+            } else {
+              return const ClientHomeScreen();
+            }
+          }
+
+          // Se não estiver autenticado, vai para o Login
+          return const LoginScreen();
+        },
+      ),
 
       routes: {
         '/login': (context) => const LoginScreen(),

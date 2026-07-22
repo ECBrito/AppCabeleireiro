@@ -1,114 +1,120 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
+import '../services/auth_service.dart'; // Import em falta corrigido
 
-enum UserRole { client, owner }
+class AuthProvider extends ChangeNotifier {
+  final AuthService _authService = AuthService();
 
-class User {
-  final String id;
-  final String name;
-  final String email;
-  final String password;
-  final UserRole role;
-  final String? shopId;
-  final String? phoneNumber;
+  UserModel? _userModel;
+  bool _isLoading = true;
 
-  User({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.password,
-    required this.role,
-    this.shopId,
-    this.phoneNumber,
-  });
-}
+  // Getters
+  UserModel? get userModel => _userModel;
+  User? get currentUser => _authService.currentUser; // Getter em falta adicionado
+  bool get isLoading => _isLoading;
+  bool get isLoggedIn => _authService.currentUser != null && _userModel != null;
 
-class AuthProvider with ChangeNotifier {
-  User? _currentUser;
+  // Verificações de Role
+  bool get isOwner => _userModel?.role == 'owner';
+  bool get isClient => _userModel?.role == 'client';
 
-  User? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
-  bool get isOwner => _currentUser?.role == UserRole.owner;
+  AuthProvider() {
+    _init();
+  }
 
-  // Base de Dados Mock
-  final List<User> _users = [
-    User(
-        id: 'admin1',
-        name: 'Dono da Loja',
-        email: 'king@barber.com',
-        password: '123',
-        role: UserRole.owner,
-        shopId: '1'
-    ),
-    User(
-        id: 'user1',
-        name: 'Ricardo Silva',
-        email: 'cliente@gmail.com',
-        password: '123',
-        role: UserRole.client,
-        phoneNumber: '912345678'
-    ),
-  ];
-
-  Future<bool> login(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Delay menor para ser rápido
-
-    try {
-      // PROCURA INTELIGENTE:
-      final user = _users.firstWhere((u) {
-        // 1. Verificação Real (Email e Pass exatos)
-        final bool isExactMatch = u.email.toLowerCase() == email.toLowerCase() && u.password == password;
-
-        // 2. Atalho de Teste (Basta escrever "admin" ou "cliente" em qualquer campo)
-        final bool isDevAdmin = email.toLowerCase().contains('admin') && u.role == UserRole.owner;
-        final bool isDevClient = email.toLowerCase().contains('client') && u.role == UserRole.client;
-
-        return isExactMatch || isDevAdmin || isDevClient;
-      });
-
-      _currentUser = user;
+  void _init() {
+    _authService.authStateChanges.listen((User? user) async {
+      if (user != null) {
+        await fetchUserProfile(user.uid);
+      } else {
+        _userModel = null;
+      }
+      _isLoading = false;
       notifyListeners();
-      return true;
+    });
+  }
+
+  Future<void> fetchUserProfile(String uid) async {
+    try {
+      final doc = await _authService.getUserProfile(uid);
+      if (doc.exists) {
+        _userModel = UserModel.fromDocument(doc);
+      } else {
+        _userModel = null;
+      }
     } catch (e) {
-      return false;
+      _userModel = null;
+      rethrow;
+    } finally {
+      notifyListeners();
     }
   }
 
-  Future<bool> register(String name, String email, String password, UserRole role) async {
-    await Future.delayed(const Duration(seconds: 1));
-    final exists = _users.any((u) => u.email.toLowerCase() == email.toLowerCase());
-    if (exists) return false;
-
-    final newUser = User(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      email: email,
-      password: password,
-      role: role,
-      shopId: role == UserRole.owner ? 'shop_${DateTime.now().millisecondsSinceEpoch}' : null,
-    );
-
-    _users.add(newUser);
-    _currentUser = newUser;
-    notifyListeners();
-    return true;
+  Future<void> login(String email, String password) async {
+    _setLoading(true);
+    try {
+      UserCredential? credential = await _authService.login(email, password);
+      if (credential?.user != null) {
+        await fetchUserProfile(credential!.user!.uid);
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
   }
 
-  void updateProfile({String? name, String? phone}) {
-    if (_currentUser == null) return;
-    _currentUser = User(
-      id: _currentUser!.id,
-      email: _currentUser!.email,
-      password: _currentUser!.password,
-      role: _currentUser!.role,
-      shopId: _currentUser!.shopId,
-      name: name ?? _currentUser!.name,
-      phoneNumber: phone ?? _currentUser!.phoneNumber,
-    );
-    notifyListeners();
+  Future<void> register({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+  }) async {
+    _setLoading(true);
+    try {
+      UserCredential? credential = await _authService.register(
+        email: email,
+        password: password,
+        name: name,
+        role: role,
+      );
+      if (credential?.user != null) {
+        await fetchUserProfile(credential!.user!.uid);
+      }
+    } catch (e) {
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
   }
 
-  void logout() {
-    _currentUser = null;
+  // Método updateProfile adicionado para suportar o ProfileScreen
+  Future<void> updateProfile({String? name, String? phone}) async {
+    if (_authService.currentUser == null) return;
+    _setLoading(true);
+    try {
+      await _authService.updateUserProfile(_authService.currentUser!.uid, {
+        if (name != null && name.isNotEmpty) 'name': name,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      });
+      await fetchUserProfile(_authService.currentUser!.uid);
+    } catch (e) {
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> logout() async {
+    _setLoading(true);
+    await _authService.logout();
+    _userModel = null;
+    _setLoading(false);
+  }
+
+  void _setLoading(bool value) {
+    _isLoading = value;
     notifyListeners();
   }
 }

@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart'; // Para datas
+import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/appointment_model.dart';
-// Se tiveres o worker_model.dart, descomenta isto e a secção de equipa
-// import '../models/worker_model.dart'; 
+import '../services/booking_db_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -20,18 +19,18 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   DateTime _selectedDate = DateTime.now();
   bool _isShopOpen = true;
+  final BookingDbService _bookingDb = BookingDbService();
 
   @override
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
-    
-    final appointments = appProvider.appointments;
-    final totalRevenue = appProvider.totalRevenue; 
+
     final themeColor = appProvider.getThemeColor();
     final shopName = appProvider.activeBusiness?.name ?? "A Minha Loja";
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,56 +54,77 @@ class _AdminDashboardState extends State<AdminDashboard> {
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
             onPressed: () {
-               authProvider.logout();
-               Navigator.pushReplacementNamed(context, '/login');
+              authProvider.logout();
+              Navigator.pushReplacementNamed(context, '/login');
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. SWITCH DE ESTADO DA LOJA
-            _buildShopStatusToggle(themeColor),
-            const SizedBox(height: 20),
+      body: StreamBuilder<List<Appointment>>(
+        stream: _bookingDb.getBookingsStream(),
+        builder: (context, snapshot) {
+          final allBookings = snapshot.data ?? [];
 
-            // 2. CARTÃO DE FATURAÇÃO
-            _buildRevenueCard(totalRevenue, themeColor),
-            const SizedBox(height: 25),
+          // 1. Filtrar marcações pela data selecionada na agenda
+          final dayAppointments = allBookings.where((appt) {
+            return appt.date.year == _selectedDate.year &&
+                appt.date.month == _selectedDate.month &&
+                appt.date.day == _selectedDate.day;
+          }).toList();
 
-            // 3. AÇÕES RÁPIDAS
-            Text("Gestão Rápida", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 15),
-            _buildQuickActionsGrid(context, themeColor),
-            const SizedBox(height: 30),
+          // 2. Calcular faturação do dia selecionado
+          final dayRevenue = dayAppointments.fold(0.0, (sum, appt) => sum + appt.price);
 
-            // 4. AGENDA
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Agenda", style: Theme.of(context).textTheme.titleLarge),
-                Icon(Icons.calendar_month, color: themeColor),
+                // 1. SWITCH DE ESTADO DA LOJA
+                _buildShopStatusToggle(themeColor),
+                const SizedBox(height: 20),
+
+                // 2. CARTÃO DE FATURAÇÃO (DINÂMICO)
+                _buildRevenueCard(dayRevenue, themeColor),
+                const SizedBox(height: 25),
+
+                // 3. AÇÕES RÁPIDAS
+                Text("Gestão Rápida", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                const SizedBox(height: 15),
+                _buildQuickActionsGrid(context, themeColor),
+                const SizedBox(height: 30),
+
+                // 4. AGENDA
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Agenda", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                    Icon(Icons.calendar_month, color: themeColor),
+                  ],
+                ),
+                const SizedBox(height: 15),
+                _buildDateSelector(themeColor),
+                const SizedBox(height: 15),
+
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  Center(child: CircularProgressIndicator(color: themeColor))
+                else if (dayAppointments.isEmpty)
+                  _buildEmptyState()
+                else
+                  _buildAppointmentList(dayAppointments, themeColor),
+
+                const SizedBox(height: 80),
               ],
             ),
-            const SizedBox(height: 15),
-            _buildDateSelector(themeColor),
-            const SizedBox(height: 15),
-
-            appointments.isEmpty
-                ? _buildEmptyState()
-                : _buildAppointmentList(appointments, themeColor),
-            
-            const SizedBox(height: 80),
-          ],
-        ),
+          );
+        },
       ),
-      
+
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-           // Futuro: Adicionar marcação manual
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Adicionar marcação manual"), backgroundColor: themeColor));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: const Text("Adicionar marcação manual"), backgroundColor: themeColor)
+          );
         },
         backgroundColor: themeColor,
         icon: const Icon(Icons.add, color: Colors.black),
@@ -172,7 +192,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Faturação Hoje", style: GoogleFonts.lato(color: Colors.black87, fontWeight: FontWeight.bold)),
+                  Text("Faturação do Dia", style: GoogleFonts.lato(color: Colors.black87, fontWeight: FontWeight.bold)),
                   Text("${revenue.toStringAsFixed(2)}€", style: GoogleFonts.playfairDisplay(color: Colors.black, fontSize: 36, fontWeight: FontWeight.w900)),
                 ],
               ),
@@ -211,9 +231,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       itemBuilder: (context, index) {
         final action = actions[index];
         return InkWell(
-          onTap: () => action['route'] != null 
+          onTap: () => action['route'] != null
               ? Navigator.pushNamed(context, action['route'] as String)
-              : ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Em breve!"), backgroundColor: color)),
+              : ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Em breve!"), backgroundColor: color)),
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -239,11 +259,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
       height: 70,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 14, 
+        itemCount: 14,
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
           final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month;
-          
+
           return GestureDetector(
             onTap: () => setState(() => _selectedDate = date),
             child: AnimatedContainer(
@@ -277,13 +297,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("Sem marcações para hoje.", style: TextStyle(color: Colors.grey))));
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(40),
+        child: Text("Sem marcações para esta data.", style: TextStyle(color: Colors.grey)),
+      ),
+    );
   }
 
   Widget _buildAppointmentList(List<Appointment> appointments, Color color) {
-    final sortedList = List.from(appointments.reversed);
     return Column(
-      children: sortedList.map((appt) {
+      children: appointments.map((appt) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
@@ -294,16 +318,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             title: Text(appt.clientName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            subtitle: Text("${appt.serviceName} • ${DateFormat('HH:mm').format(appt.date)}", style: TextStyle(color: Colors.grey[400])),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text("${appt.price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
-                // Se tiveres workerName no modelo, usa aqui:
-                // Text(appt.workerName, style: const TextStyle(color: Colors.white54, fontSize: 10)),
-              ],
-            ),
+            subtitle: Text("${appt.serviceName} • ${appt.time} (${appt.workerName})", style: TextStyle(color: Colors.grey[400])),
+            trailing: Text("${appt.price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ).animate().fadeIn().slideY(begin: 0.1, end: 0);
       }).toList(),

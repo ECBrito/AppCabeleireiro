@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
-import '../../providers/app_provider.dart';
 import '../../models/service_model.dart';
+import '../../providers/app_provider.dart';
+import '../../services/service_db_service.dart';
 
 class ServiceManageScreen extends StatefulWidget {
   const ServiceManageScreen({super.key});
@@ -12,186 +13,212 @@ class ServiceManageScreen extends StatefulWidget {
 }
 
 class _ServiceManageScreenState extends State<ServiceManageScreen> {
-  // Controladores para o formulário
-  final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _durationController = TextEditingController();
+  final ServiceDbService _serviceDb = ServiceDbService();
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _priceController.dispose();
-    _durationController.dispose();
-    super.dispose();
-  }
+  void _showServiceForm([ServiceModel? existingService]) {
+    final nameController = TextEditingController(text: existingService?.name ?? '');
+    final priceController = TextEditingController(text: existingService?.price.toString() ?? '');
+    final durationController = TextEditingController(text: existingService?.durationMinutes.toString() ?? '30');
+    final descController = TextEditingController(text: existingService?.description ?? '');
 
-  void _showAddServiceDialog(BuildContext context) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text("Novo Serviço", style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: "Nome (ex: Corte Navalha)",
-                prefixIcon: Icon(Icons.cut, color: AppColors.gold),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _priceController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: "Preço (€)",
-                prefixIcon: Icon(Icons.euro, color: AppColors.gold),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _durationController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Duração (minutos)",
-                prefixIcon: Icon(Icons.timer, color: AppColors.gold),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _clearControllers();
-              Navigator.pop(ctx);
-            },
-            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (_nameController.text.isNotEmpty && _priceController.text.isNotEmpty) {
-                final newService = Service(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: _nameController.text,
-                  price: double.tryParse(_priceController.text.replaceAll(',', '.')) ?? 0.0,
-                  durationMinutes: int.tryParse(_durationController.text) ?? 30,
-                );
-                
-                // Adiciona ao Provider
-                Provider.of<AppProvider>(context, listen: false).addService(newService);
-                
-                _clearControllers();
-                Navigator.pop(ctx);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Serviço adicionado com sucesso!")),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gold,
-              foregroundColor: Colors.black,
-            ),
-            child: const Text("ADICIONAR", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-    );
-  }
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  existingService == null ? "Adicionar Novo Serviço" : "Editar Serviço",
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Nome do Serviço",
+                    filled: true,
+                    fillColor: Colors.black26,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: "Preço (€)",
+                          filled: true,
+                          fillColor: Colors.black26,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: durationController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: "Duração (min)",
+                          filled: true,
+                          fillColor: Colors.black26,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Descrição (opcional)",
+                    filled: true,
+                    fillColor: Colors.black26,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      final price = double.tryParse(priceController.text.replaceAll(',', '.')) ?? 0.0;
+                      final duration = int.tryParse(durationController.text) ?? 30;
+                      final desc = descController.text.trim();
 
-  void _clearControllers() {
-    _nameController.clear();
-    _priceController.clear();
-    _durationController.clear();
+                      if (name.isEmpty) return;
+
+                      final service = ServiceModel(
+                        id: existingService?.id ?? '',
+                        name: name,
+                        price: price,
+                        durationMinutes: duration,
+                        description: desc,
+                      );
+
+                      if (existingService == null) {
+                        await _serviceDb.addService(service);
+                      } else {
+                        await _serviceDb.updateService(service);
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.gold,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text(
+                      existingService == null ? "GUARDAR" : "ATUALIZAR",
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<AppProvider>(context);
-    final services = provider.services;
-    final themeColor = provider.getThemeColor();
+    final appProvider = Provider.of<AppProvider>(context);
+    final themeColor = appProvider.getThemeColor();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Gerir Serviços'),
+        title: const Text("Gestão de Serviços"),
         backgroundColor: AppColors.background,
         iconTheme: IconThemeData(color: themeColor),
       ),
-      body: services.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.list_alt, size: 60, color: Colors.grey[800]),
-                  const SizedBox(height: 15),
-                  const Text("Sem serviços. Adiciona um!", style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: services.length,
-              itemBuilder: (context, index) {
-                final service = services[index];
-                return Card(
-                  color: AppColors.surface,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.white.withOpacity(0.05)),
+      body: StreamBuilder<List<ServiceModel>>(
+        stream: _serviceDb.getServicesStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: themeColor));
+          }
+
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text("Erro ao carregar serviços.", style: TextStyle(color: Colors.redAccent)),
+            );
+          }
+
+          final services = snapshot.data ?? [];
+
+          if (services.isEmpty) {
+            return const Center(
+              child: Text("Sem serviços registados.", style: TextStyle(color: Colors.grey)),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: services.length,
+            itemBuilder: (context, index) {
+              final service = services[index];
+              return Card(
+                color: const Color(0xFF1E1E1E),
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  title: Text(
+                    service.name,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: themeColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                  subtitle: Text(
+                    "${service.durationMinutes} min • ${service.description}",
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "${service.price.toStringAsFixed(2)}€",
+                        style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-                      child: Icon(Icons.content_cut, color: themeColor),
-                    ),
-                    title: Text(
-                      service.name, 
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                    ),
-                    subtitle: Text(
-                      "${service.durationMinutes} min", 
-                      style: TextStyle(color: themeColor.withOpacity(0.7)),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "${service.price.toStringAsFixed(2)}€", 
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
-                        ),
-                        const SizedBox(width: 10),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () {
-                            provider.removeService(service.id);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Serviço removido.")),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.grey),
+                        onPressed: () => _showServiceForm(service),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.redAccent),
+                        onPressed: () => _serviceDb.deleteService(service.id),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddServiceDialog(context),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showServiceForm(),
         backgroundColor: themeColor,
-        icon: const Icon(Icons.add, color: Colors.black),
-        label: const Text("NOVO SERVIÇO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        child: const Icon(Icons.add, color: Colors.black),
       ),
     );
   }

@@ -12,27 +12,60 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
-    _nameController.text = user?.name ?? "Cliente";
-    _emailController.text = user?.email ?? "email@exemplo.com";
-    _phoneController.text = user?.phoneNumber ?? "912345678";
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
+    // Inicializa com os dados do Firestore vindos do UserModel
+    _nameController = TextEditingController(text: auth.userModel?.name ?? "");
+    _emailController = TextEditingController(text: auth.userModel?.email ?? "");
+    _phoneController = TextEditingController(text: auth.userModel?.businessId ?? ""); // Ou campo de telefone se tiveres no model
   }
 
-  void _saveProfile() {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _saveProfile() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    auth.updateProfile(name: _nameController.text, phone: _phoneController.text);
-    setState(() => _isEditing = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Perfil atualizado com sucesso!")),
-    );
+
+    try {
+      await auth.updateProfile(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+
+      if (mounted) {
+        setState(() => _isEditing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Perfil atualizado com sucesso!"),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erro ao atualizar perfil. Tenta novamente."),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -93,15 +126,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 40),
 
-            _buildProfileField("Nome Completo", _nameController, Icons.person, themeColor),
+            _buildProfileField("Nome Completo", _nameController, Icons.person, themeColor, isEditable: _isEditing),
             const SizedBox(height: 20),
-            _buildProfileField("Email", _emailController, Icons.email, themeColor),
+            // O Email fica desativado para edição para evitar dessincronização com a conta do Firebase Auth
+            _buildProfileField("Email", _emailController, Icons.email, themeColor, isEditable: false),
             const SizedBox(height: 20),
-            _buildProfileField("Telemóvel", _phoneController, Icons.phone, themeColor),
+            _buildProfileField("Telemóvel", _phoneController, Icons.phone, themeColor, isEditable: _isEditing),
 
             const SizedBox(height: 40),
 
-            // --- ÁREA DE VINCULAÇÃO (NOVO) ---
+            // --- ÁREA DE VINCULAÇÃO ---
             if (currentShop != null) ...[
               Container(
                 padding: const EdgeInsets.all(20),
@@ -131,7 +165,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: () {
                           // AÇÃO DE DESVINCULAR
                           appProvider.unlinkBusiness();
-                          // Nota: O main.dart deteta isto e muda para o ecrã de LinkScreen automaticamente
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
@@ -151,9 +184,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: TextButton.icon(
-                onPressed: () {
-                  auth.logout();
-                  Navigator.pushReplacementNamed(context, '/login');
+                onPressed: () async {
+                  await auth.logout();
+                  if (context.mounted) {
+                    Navigator.pushReplacementNamed(context, '/login');
+                  }
                 },
                 icon: const Icon(Icons.logout, color: Colors.grey),
                 label: const Text("Terminar Sessão na Conta", style: TextStyle(color: Colors.grey)),
@@ -165,18 +200,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileField(String label, TextEditingController controller, IconData icon, Color color) {
+  Widget _buildProfileField(
+      String label,
+      TextEditingController controller,
+      IconData icon,
+      Color color,
+      {required bool isEditable}
+      ) {
     return TextField(
       controller: controller,
-      enabled: _isEditing,
-      style: TextStyle(color: _isEditing ? Colors.white : Colors.grey),
+      enabled: isEditable,
+      style: TextStyle(color: isEditable ? Colors.white : Colors.grey),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: _isEditing ? color : Colors.grey),
+        labelStyle: TextStyle(color: isEditable ? color : Colors.grey),
+        prefixIcon: Icon(icon, color: isEditable ? color : Colors.grey),
         filled: true,
         fillColor: const Color(0xFF1E1E1E),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white10),
+        ),
       ),
     );
   }
