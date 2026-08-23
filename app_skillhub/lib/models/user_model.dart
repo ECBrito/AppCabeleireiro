@@ -1,44 +1,41 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
-  final String uid;
-  final String email;
+  final int id;
   final String name;
-  final String role; // 'client' ou 'owner'
-  final String? businessId;
-  final DateTime? createdAt;
+  final String email;
+  final String role;
+  final String? phone;
+  final int? businessId;
 
   UserModel({
-    required this.uid,
-    required this.email,
+    required this.id,
     required this.name,
+    required this.email,
     required this.role,
+    this.phone,
     this.businessId,
-    this.createdAt,
   });
 
-  // Converte o documento do Firestore para o modelo Dart
-  factory UserModel.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      uid: doc.id,
-      email: data['email'] ?? '',
-      name: data['name'] ?? '',
-      role: data['role'] ?? 'client',
-      businessId: data['businessId'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      role: json['role'] ?? 'client',
+      phone: json['phone'],
+      businessId: json['business_id'] != null
+          ? int.tryParse(json['business_id'].toString())
+          : null,
     );
   }
 
-  // Converte para Map caso precises de atualizar dados
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
-      'uid': uid,
-      'email': email,
+      'id': id,
       'name': name,
+      'email': email,
       'role': role,
-      'businessId': businessId,
-      'createdAt': createdAt,
+      'phone': phone,
+      'business_id': businessId,
     };
   }
 }

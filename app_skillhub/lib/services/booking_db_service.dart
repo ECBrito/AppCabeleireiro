@@ -1,52 +1,61 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../models/appointment_model.dart';
 
 class BookingDbService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static const String baseUrl = 'http://10.0.2.2:3000/bookings';
 
-  // Guardar nova marcação
-  Future<void> createBooking(Appointment appointment) async {
-    await _db.collection('bookings').add({
-      'clientName': appointment.clientName,
-      'serviceName': appointment.serviceName,
-      'price': appointment.price,
-      'date': Timestamp.fromDate(appointment.date),
-      'time': appointment.time,
-      'shopId': appointment.shopId,
-      'workerId': appointment.workerId,
-      'workerName': appointment.workerName,
-      'colorHex': appointment.colorHex,
-      'status': appointment.status.name, // "pending", "confirmed", etc.
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  // Obter agendamentos
+  Future<List<Appointment>> getBookings({int shopId = 1, String? date}) async {
+    String url = '$baseUrl?shopId=$shopId';
+    if (date != null && date.isNotEmpty) {
+      url += '&date=$date';
+    }
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Appointment.fromJson(json)).toList();
+    } else {
+      throw Exception('Falha ao obter marcações');
+    }
   }
 
-  // Stream de marcações para a Dashboard
-  Stream<List<Appointment>> getBookingsStream() {
-    return _db
-        .collection('bookings')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Appointment(
-          id: doc.id,
-          clientName: data['clientName'] ?? 'Cliente',
-          serviceName: data['serviceName'] ?? '',
-          price: (data['price'] as num?)?.toDouble() ?? 0.0,
-          date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          time: data['time'] ?? '',
-          shopId: data['shopId'] ?? '',
-          workerId: data['workerId'] ?? '',
-          workerName: data['workerName'] ?? '',
-          colorHex: data['colorHex'] ?? 0xFFFFD700,
-          status: AppointmentStatus.values.firstWhere(
-                (e) => e.name == data['status'],
-            orElse: () => AppointmentStatus.pending,
-          ),
-        );
-      }).toList();
-    });
+  // Stream para Dashboard
+  Stream<List<Appointment>> getBookingsStream({int shopId = 1, String? date}) async* {
+    yield await getBookings(shopId: shopId, date: date);
+  }
+
+  // Criar nova marcação
+  Future<Appointment> createBooking(Appointment appointment) async {
+    final response = await http.post(
+      Uri.parse(baseUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(appointment.toJson()),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return Appointment.fromJson(jsonDecode(response.body));
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Erro ao registar marcação');
+    }
+  }
+
+  // Atualizar Estado da Marcação (ex: confirmar, cancelar)
+  Future<void> updateBookingStatus(int bookingId, AppointmentStatus status) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/$bookingId/status'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'status': status.name}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Erro ao atualizar estado da marcação');
+    }
   }
 }

@@ -27,44 +27,37 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _submit() async {
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
+
+    final email = _emailController.text.trim();
+    final password = _passController.text.trim();
 
     setState(() => _isLoading = true);
 
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
 
-      await auth.login(
-        _emailController.text.trim(),
-        _passController.text,
-      );
+      await auth.login(email, password);
 
       if (!mounted) return;
 
-      if (auth.isLoggedIn) {
-        if (auth.isOwner) {
-          Navigator.pushReplacementNamed(context, '/admin_dashboard');
-        } else {
-          Navigator.pushReplacementNamed(context, '/client_home');
-        }
+      // Redireciona consoante o perfil devolvido pela API
+      if (auth.isOwner) {
+        Navigator.pushReplacementNamed(context, '/admin_dashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/client_home');
       }
     } catch (error) {
       if (!mounted) return;
 
       String errorMessage = "Email ou palavra-passe incorretos.";
-      final errStr = error.toString().toLowerCase();
-
-      // Mapeamento detalhado de erros do Firebase Auth
-      if (errStr.contains('configuration_not_found')) {
-        errorMessage = "Autenticação por Email não ativada no Firebase Console!";
-      } else if (errStr.contains('user-not-found') || errStr.contains('invalid-credential')) {
-        errorMessage = "Email ou palavra-passe incorretos.";
-      } else if (errStr.contains('wrong-password')) {
-        errorMessage = "Palavra-passe incorreta.";
-      } else if (errStr.contains('invalid-email')) {
-        errorMessage = "O formato do email é inválido.";
-      } else if (errStr.contains('network-request-failed')) {
-        errorMessage = "Sem ligação à internet.";
+      if (error is Exception) {
+        final cleanMsg = error.toString().replaceAll('Exception:', '').trim();
+        if (cleanMsg.isNotEmpty) {
+          errorMessage = cleanMsg;
+        }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(

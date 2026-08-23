@@ -108,7 +108,7 @@ class _ServiceManageScreenState extends State<ServiceManageScreen> {
                       if (name.isEmpty) return;
 
                       final service = ServiceModel(
-                        id: existingService?.id ?? '',
+                        id: existingService?.id ?? 0,
                         name: name,
                         price: price,
                         durationMinutes: duration,

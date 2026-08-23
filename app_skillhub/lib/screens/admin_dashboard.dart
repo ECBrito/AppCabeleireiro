@@ -21,6 +21,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool _isShopOpen = true;
   final BookingDbService _bookingDb = BookingDbService();
 
+  String get _formattedSelectedDate {
+    return "${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+  }
+
+  Future<void> _updateStatus(Appointment appt, AppointmentStatus newStatus) async {
+    try {
+      await _bookingDb.updateBookingStatus(appt.id, newStatus);
+      setState(() {}); // Recarrega a stream
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Marcação atualizada para: ${newStatus.name}"),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context);
@@ -61,19 +87,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
       body: StreamBuilder<List<Appointment>>(
-        stream: _bookingDb.getBookingsStream(),
+        key: ValueKey(_formattedSelectedDate),
+        stream: _bookingDb.getBookingsStream(shopId: 1, date: _formattedSelectedDate),
         builder: (context, snapshot) {
-          final allBookings = snapshot.data ?? [];
+          final dayAppointments = snapshot.data ?? [];
 
-          // 1. Filtrar marcações pela data selecionada na agenda
-          final dayAppointments = allBookings.where((appt) {
-            return appt.date.year == _selectedDate.year &&
-                appt.date.month == _selectedDate.month &&
-                appt.date.day == _selectedDate.day;
-          }).toList();
-
-          // 2. Calcular faturação do dia selecionado
-          final dayRevenue = dayAppointments.fold(0.0, (sum, appt) => sum + appt.price);
+          // Calcular faturação apenas de marcações não canceladas
+          final dayRevenue = dayAppointments
+              .where((appt) => appt.status != AppointmentStatus.cancelled)
+              .fold(0.0, (sum, appt) => sum + appt.price);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -119,13 +141,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         },
       ),
-
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: const Text("Adicionar marcação manual"), backgroundColor: themeColor)
-          );
-        },
+        onPressed: () => Navigator.pushNamed(context, '/booking'),
         backgroundColor: themeColor,
         icon: const Icon(Icons.add, color: Colors.black),
         label: const Text("NOVA MARCAÇÃO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -192,7 +209,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Faturação do Dia", style: GoogleFonts.lato(color: Colors.black87, fontWeight: FontWeight.bold)),
+                  Text("Faturação Estimada do Dia", style: GoogleFonts.lato(color: Colors.black87, fontWeight: FontWeight.bold)),
                   Text("${revenue.toStringAsFixed(2)}€", style: GoogleFonts.playfairDisplay(color: Colors.black, fontSize: 36, fontWeight: FontWeight.w900)),
                 ],
               ),
@@ -212,11 +229,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final actions = [
       {'title': 'Serviços', 'icon': Icons.content_cut, 'route': '/services_manage'},
       {'title': 'Equipa', 'icon': Icons.people, 'route': '/workers_manage'},
-      {'title': 'Clientes', 'icon': Icons.people, 'route': '/customers_manage'},
+      {'title': 'Clientes', 'icon': Icons.people_outline, 'route': '/customers_manage'},
       {'title': 'Promoções', 'icon': Icons.local_offer, 'route': '/promotions_manage'},
-      {'title': 'Relatórios', 'icon': Icons.bar_chart, 'route': '/reports'},
-      {'title': 'Horários', 'icon': Icons.access_time, 'route': '/schedule'},
-      {'title': 'Despesas', 'icon': Icons.attach_money, 'route': '/expenses'},
     ];
 
     return GridView.builder(
@@ -263,7 +277,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         itemCount: 14,
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
-          final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month;
+          final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month && date.year == _selectedDate.year;
 
           return GestureDetector(
             onTap: () => setState(() => _selectedDate = date),
@@ -314,13 +328,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border(left: BorderSide(color: color, width: 4)),
+            border: Border(left: BorderSide(color: appt.statusColor, width: 4)),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             title: Text(appt.clientName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            subtitle: Text("${appt.serviceName} • ${appt.time} (${appt.workerName})", style: TextStyle(color: Colors.grey[400])),
-            trailing: Text("${appt.price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("${appt.serviceName} • ${appt.time} (${appt.workerName})", style: TextStyle(color: Colors.grey[400])),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: appt.statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    appt.statusText.toUpperCase(),
+                    style: TextStyle(color: appt.statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("${appt.price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+                PopupMenuButton<AppointmentStatus>(
+                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                  color: AppColors.surface,
+                  onSelected: (newStatus) => _updateStatus(appt, newStatus),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: AppointmentStatus.confirmed,
+                      child: Text("Confirmar", style: TextStyle(color: Colors.green)),
+                    ),
+                    const PopupMenuItem(
+                      value: AppointmentStatus.completed,
+                      child: Text("Concluir", style: TextStyle(color: Colors.blue)),
+                    ),
+                    const PopupMenuItem(
+                      value: AppointmentStatus.cancelled,
+                      child: Text("Cancelar", style: TextStyle(color: Colors.redAccent)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ).animate().fadeIn().slideY(begin: 0.1, end: 0);
       }).toList(),

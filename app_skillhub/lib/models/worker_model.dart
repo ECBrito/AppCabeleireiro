@@ -1,79 +1,42 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Worker {
-  final String id;
+  final int id;
+  final int shopId;
   final String name;
   final String photoUrl;
-  final String role; // ex: "Barbeiro Sénior"
-  final String bio; // ex: "Especialista em degrade e barba tradicional"
+  final String role;
+  final String bio;
   final double rating;
-  final String shopId;
 
   Worker({
     required this.id,
+    this.shopId = 1,
     required this.name,
     required this.photoUrl,
-    this.role = 'Profissional', // <--- Torna opcional com valor por defeito
+    this.role = 'Profissional',
     this.bio = '',
-    required this.rating,
-    required this.shopId,
+    this.rating = 5.0,
   });
 
-  // Converte DocumentSnapshot do Firestore para o modelo Worker
-  factory Worker.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory Worker.fromJson(Map<String, dynamic> json) {
     return Worker(
-      id: doc.id,
-      name: data['name'] ?? '',
-      photoUrl: data['photoUrl'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
-      role: data['role'] ?? 'Profissional',
-      bio: data['bio'] ?? '',
-      rating: (data['rating'] as num?)?.toDouble() ?? 5.0,
-      shopId: data['shopId'] ?? '1',
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      shopId: json['shop_id'] != null ? int.parse(json['shop_id'].toString()) : 1,
+      name: json['name'] ?? '',
+      photoUrl: json['photo_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+      role: json['role'] ?? 'Profissional',
+      bio: json['bio'] ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
     );
   }
 
-  // Converte o modelo Worker para Map (guardar no Firestore)
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
+      'shop_id': shopId,
       'name': name,
-      'photoUrl': photoUrl,
+      'photo_url': photoUrl,
       'role': role,
       'bio': bio,
       'rating': rating,
-      'shopId': shopId,
-      'createdAt': FieldValue.serverTimestamp(),
     };
   }
 }
-
-// --- DADOS DE TESTE (Fallback) ---
-final List<Worker> mockWorkers = [
-  Worker(
-    id: 'w1',
-    name: 'Carlos Tesoura',
-    role: 'Mestre Barbeiro',
-    bio: 'Mais de 10 anos de experiência em cortes clássicos.',
-    rating: 4.9,
-    shopId: '1',
-    photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-  ),
-  Worker(
-    id: 'w2',
-    name: 'André Navalha',
-    role: 'Especialista',
-    bio: 'Mestre em barboterapia e alinhamento de barba.',
-    rating: 4.7,
-    shopId: '1',
-    photoUrl: 'https://randomuser.me/api/portraits/men/44.jpg',
-  ),
-  Worker(
-    id: 'w3',
-    name: 'Sofia Ink',
-    role: 'Tatuadora',
-    bio: 'Especializada em Realismo e Fineline.',
-    rating: 5.0,
-    shopId: '2',
-    photoUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-  ),
-];

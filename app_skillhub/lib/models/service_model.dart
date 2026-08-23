@@ -1,42 +1,40 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ServiceModel {
-  final String id;
+  final int id;
+  final int shopId;
   final String name;
   final double price;
   final int durationMinutes;
   final String description;
-  final bool isActive;
 
   ServiceModel({
     required this.id,
+    this.shopId = 1,
     required this.name,
     required this.price,
     required this.durationMinutes,
     this.description = '',
-    this.isActive = true,
   });
 
-  factory ServiceModel.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  factory ServiceModel.fromJson(Map<String, dynamic> json) {
     return ServiceModel(
-      id: doc.id,
-      name: data['name'] ?? '',
-      price: (data['price'] as num?)?.toDouble() ?? 0.0,
-      durationMinutes: (data['durationMinutes'] as num?)?.toInt() ?? 30,
-      description: data['description'] ?? '',
-      isActive: data['isActive'] ?? true,
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      shopId: json['shop_id'] != null ? int.parse(json['shop_id'].toString()) : 1,
+      name: json['name'] ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      durationMinutes: json['duration_minutes'] != null
+          ? int.parse(json['duration_minutes'].toString())
+          : 30,
+      description: json['description'] ?? '',
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
+      'shop_id': shopId,
       'name': name,
       'price': price,
-      'durationMinutes': durationMinutes,
+      'duration_minutes': durationMinutes,
       'description': description,
-      'isActive': isActive,
-      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 }

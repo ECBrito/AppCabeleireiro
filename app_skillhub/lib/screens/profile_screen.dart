@@ -25,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Inicializa com os dados do Firestore vindos do UserModel
     _nameController = TextEditingController(text: auth.userModel?.name ?? "");
     _emailController = TextEditingController(text: auth.userModel?.email ?? "");
-    _phoneController = TextEditingController(text: auth.userModel?.businessId ?? ""); // Ou campo de telefone se tiveres no model
+    _phoneController = TextEditingController(text: auth.userModel?.phone ?? ""); // Ou campo de telefone se tiveres no model
   }
 
   @override

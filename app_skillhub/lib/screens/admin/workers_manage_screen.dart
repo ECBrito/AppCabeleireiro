@@ -15,7 +15,7 @@ class WorkersManageScreen extends StatefulWidget {
 class _WorkersManageScreenState extends State<WorkersManageScreen> {
   final WorkerDbService _workerDb = WorkerDbService();
 
-  void _showAddWorkerDialog(Color themeColor, String shopId) {
+  void _showAddWorkerDialog(Color themeColor, int shopId) {
     final nameController = TextEditingController();
     final bioController = TextEditingController();
 
@@ -56,7 +56,7 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
             onPressed: () async {
               if (nameController.text.trim().isNotEmpty) {
                 final newWorker = Worker(
-                  id: '',
+                  id: 0,
                   name: nameController.text.trim(),
                   photoUrl: 'https://randomuser.me/api/portraits/men/${(10 + DateTime.now().second % 80)}.jpg',
                   rating: 5.0,
@@ -64,7 +64,10 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
                   bio: bioController.text.trim(),
                 );
                 await _workerDb.addWorker(newWorker);
-                if (ctx.mounted) Navigator.pop(ctx);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  setState(() {});
+                }
               }
             },
             child: const Text("GUARDAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -78,7 +81,7 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context);
     final themeColor = appProvider.getThemeColor();
-    final shopId = appProvider.activeBusiness?.id ?? '1';
+    final int shopId = int.tryParse(appProvider.activeBusiness?.id.toString() ?? '1') ?? 1;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -88,7 +91,7 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
         iconTheme: IconThemeData(color: themeColor),
       ),
       body: StreamBuilder<List<Worker>>(
-        stream: _workerDb.getWorkersStream(),
+        stream: _workerDb.getWorkersStream(shopId: shopId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: themeColor));
@@ -124,6 +127,7 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
                     icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                     onPressed: () async {
                       await _workerDb.deleteWorker(worker.id);
+                      setState(() {});
                     },
                   ),
                 ),

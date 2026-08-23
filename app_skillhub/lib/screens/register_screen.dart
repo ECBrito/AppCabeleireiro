@@ -29,6 +29,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -47,21 +49,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SnackBar(
           content: Text("Conta criada com sucesso!"),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
-      // Redireciona de acordo com o role selecionado
-      if (_selectedRole == 'owner') {
-        Navigator.pushReplacementNamed(context, '/admin_dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/client_home');
-      }
+      // O Consumer no main.dart deteta a sessão e encaminha para o ecrã correto automaticamente.
     } catch (e) {
       if (!mounted) return;
+
+      String errorMessage = "Erro ao criar conta.";
+      if (e is Exception) {
+        final cleanMsg = e.toString().replaceAll('Exception:', '').trim();
+        if (cleanMsg.isNotEmpty) {
+          errorMessage = cleanMsg;
+        }
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erro ao criar conta: ${e.toString()}"),
+          content: Text(errorMessage),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -142,7 +150,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Insere o teu nome' : null,
+                    validator: (val) =>
+                    val == null || val.trim().isEmpty ? 'Insere o teu nome' : null,
                   ),
                   const SizedBox(height: 15),
 
@@ -162,7 +171,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    validator: (val) => val == null || !val.contains('@') ? 'E-mail inválido' : null,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Insere o e-mail';
+                      if (!val.contains('@') || !val.contains('.')) return 'E-mail inválido';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 15),
 
@@ -189,7 +202,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    validator: (val) => val == null || val.length < 6 ? 'Mínimo 6 caracteres' : null,
+                    validator: (val) =>
+                    val == null || val.length < 6 ? 'Mínimo 6 caracteres' : null,
                   ),
                   const SizedBox(height: 30),
 
@@ -205,7 +219,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     child: authProvider.isLoading
-                        ? const CircularProgressIndicator(color: Colors.black)
+                        ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
                         : const Text(
                       'CRIAR CONTA',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),

@@ -1,76 +1,118 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import '../models/user_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  // 10.0.2.2 aponta para o localhost da máquina host no emulador Android
+  static const String baseUrl = 'http://10.0.2.2:3000/auth';
 
-  // Obter o utilizador atual do Firebase Auth
-  User? get currentUser => _auth.currentUser;
+  UserModel? _currentUser;
+  final _authStateController = StreamController<UserModel?>.broadcast();
 
-  // Stream do estado de autenticação (para reagir quando entra/sai)
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  UserModel? get currentUser => _currentUser;
+  Stream<UserModel?> get authStateChanges => _authStateController.stream;
 
   // Login com Email e Password
-  Future<UserCredential?> login(String email, String password) async {
+  Future<UserModel> login(String email, String password) async {
+    debugPrint("=== [DEBUG AUTH_SERVICE] 1. A iniciar pedido HTTP POST para $baseUrl/login ===");
+
     try {
-      return await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } catch (e) {
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 7));
+
+      debugPrint("=== [DEBUG AUTH_SERVICE] 2. Resposta recebida. Status: ${response.statusCode} ===");
+      debugPrint("=== [DEBUG AUTH_SERVICE] 3. Corpo: ${response.body} ===");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final user = UserModel.fromJson(data['user']);
+        _currentUser = user;
+        _authStateController.add(_currentUser);
+        debugPrint("=== [DEBUG AUTH_SERVICE] 4. Login OK. User: ${user.name} | Role: ${user.role} ===");
+        return user;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Falha ao iniciar sessão');
+      }
+    } catch (e, stack) {
+      debugPrint("=== [DEBUG AUTH_SERVICE] ERRO NO POST: $e ===");
+      debugPrint(stack.toString());
       rethrow;
     }
   }
 
-  // Registo de Utilizador + Guardar Perfil no Firestore
-  Future<UserCredential?> register({
+  // Registo de Utilizador
+  Future<UserModel> register({
     required String email,
     required String password,
     required String name,
-    required String role, // 'client' ou 'owner'
-    String? businessId,
+    required String role,
+    String? phone,
   }) async {
-    try {
-      UserCredential res = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+    final response = await http.post(
+      Uri.parse('$baseUrl/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+        'phone': phone,
+      }),
+    ).timeout(const Duration(seconds: 7));
 
-      // Guardar dados extra no Firestore
-      if (res.user != null) {
-        await _db.collection('users').doc(res.user!.uid).set({
-          'uid': res.user!.uid,
-          'name': name,
-          'email': email,
-          'role': role,
-          'businessId': businessId ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      return res;
-    } catch (e) {
-      rethrow;
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final user = UserModel.fromJson(data['user']);
+      _currentUser = user;
+      _authStateController.add(_currentUser);
+      return user;
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Falha ao criar conta');
     }
   }
 
-  // Obter dados do utilizador do Firestore
-  Future<DocumentSnapshot> getUserProfile(String uid) async {
-    return await _db.collection('users').doc(uid).get();
+  // Obter perfil do utilizador
+  Future<UserModel> getUserProfile(int id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/profile/$id'),
+      headers: {'Content-Type': 'application/json'},
+    ).timeout(const Duration(seconds: 7));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return UserModel.fromJson(data['user']);
+    } else {
+      throw Exception('Perfil não encontrado');
+    }
   }
 
-  // Atualizar dados do utilizador no Firestore
-  Future<void> updateUserProfile(String uid, Map<String, dynamic> data) async {
-    try {
-      await _db.collection('users').doc(uid).update(data);
-    } catch (e) {
-      rethrow;
+  // Atualizar dados do utilizador
+  Future<void> updateUserProfile(int id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/profile/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    ).timeout(const Duration(seconds: 7));
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Erro ao atualizar perfil');
     }
   }
 
   // Logout
   Future<void> logout() async {
-    await _auth.signOut();
+    _currentUser = null;
+    _authStateController.add(null);
   }
 }

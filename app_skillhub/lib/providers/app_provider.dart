@@ -23,9 +23,9 @@ class AppProvider with ChangeNotifier {
 
   // Lista de Serviços (agora a usar a classe ServiceModel)
   final List<ServiceModel> _services = [
-    ServiceModel(id: '1', name: 'Serviço Premium', price: 25.0, durationMinutes: 60),
-    ServiceModel(id: '2', name: 'Serviço Rápido', price: 15.0, durationMinutes: 30),
-    ServiceModel(id: '3', name: 'Consultoria', price: 0.00, durationMinutes: 15),
+    ServiceModel(id: 1, name: 'Serviço Premium', price: 25.0, durationMinutes: 60),
+    ServiceModel(id: 2, name: 'Serviço Rápido', price: 15.0, durationMinutes: 30),
+    ServiceModel(id: 3, name: 'Consultoria', price: 0.00, durationMinutes: 15),
   ];
   List<ServiceModel> get services => _services;
 
@@ -46,7 +46,7 @@ class AppProvider with ChangeNotifier {
   ];
 
   // Trabalhadores
-  final List<Worker> _allWorkers = mockWorkers;
+  final List<Worker> _allWorkers = [];
   List<Worker> get shopWorkers => _allWorkers;
 
   BarberShop? get currentShop => _activeBusiness != null
@@ -140,7 +140,10 @@ class AppProvider with ChangeNotifier {
 
   // Atualizados para ServiceModel
   void addService(ServiceModel service) { _services.add(service); notifyListeners(); }
-  void removeService(String id) { _services.removeWhere((s) => s.id == id); notifyListeners(); }
+  void removeService(int id) {
+    _services.removeWhere((s) => s.id == id);
+    notifyListeners();
+  }
 
   Future<bool> linkBusiness(String code) async {
     await Future.delayed(const Duration(seconds: 1));

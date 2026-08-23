@@ -58,16 +58,16 @@ class _BookingScreenState extends State<BookingScreen> {
           : (authProvider.currentUser?.email ?? "Cliente");
 
       final newAppointment = Appointment(
-        id: '',
+        id: 0,
+        clientId: authProvider.userModel?.id,
         clientName: clientName,
         serviceName: _selectedServiceName!,
         price: _selectedServicePrice,
         date: _selectedDate,
         time: _selectedTime!,
-        shopId: appProvider.currentShop?.id ?? '1',
+        shopId: 1,
         workerId: _selectedWorker!.id,
         workerName: _selectedWorker!.name,
-        colorHex: appProvider.activeBusiness?.colorHex ?? 0xFFFFD700,
         status: AppointmentStatus.pending,
       );
 

@@ -1,4 +1,4 @@
-package com.skillhub.app_skillhub
+package com.example.app_skillhub
 
 import io.flutter.embedding.android.FlutterActivity
 
