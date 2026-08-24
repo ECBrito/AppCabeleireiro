@@ -90,10 +90,18 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return UserModel.fromJson(data['user']);
+      final user = UserModel.fromJson(data['user']);
+      _currentUser = user;
+      _authStateController.add(_currentUser);
+      return user;
     } else {
       throw Exception('Perfil não encontrado');
     }
+  }
+
+  void setCurrentUserFromMap(Map<String, dynamic> json) {
+    _currentUser = UserModel.fromJson(json);
+    _authStateController.add(_currentUser);
   }
 
   // Atualizar dados do utilizador

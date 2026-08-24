@@ -1,8 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../../../config/theme.dart';
 import '../../../providers/app_provider.dart';
-import '../../../models/customer_model.dart';
 
 class CustomerManageScreen extends StatefulWidget {
   const CustomerManageScreen({super.key});
@@ -12,13 +13,72 @@ class CustomerManageScreen extends StatefulWidget {
 }
 
 class _CustomerManageScreenState extends State<CustomerManageScreen> {
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _searchController = TextEditingController();
-  String _searchQuery = "";
 
-  void _showAddCustomerDialog(BuildContext context) {
+  String _searchQuery = "";
+  late Future<List<dynamic>> _customersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomers();
+  }
+
+  void _loadCustomers() {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(appProvider.activeBusiness?.id ?? '1') ?? 1;
+    setState(() {
+      _customersFuture = _fetchCustomers(shopId);
+    });
+  }
+
+  Future<List<dynamic>> _fetchCustomers(int shopId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/customers?shopId=$shopId'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _addCustomer(int shopId) async {
+    if (_nameController.text.trim().isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/customers'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'shop_id': shopId,
+          'name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'email': _emailController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        _clearControllers();
+        _loadCustomers();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _deleteCustomer(int id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/customers/$id'));
+      if (response.statusCode == 200) {
+        _loadCustomers();
+      }
+    } catch (_) {}
+  }
+
+  void _showAddCustomerDialog(BuildContext context, int shopId) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -45,24 +105,9 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
             child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (_nameController.text.isNotEmpty) {
-                final newCustomer = Customer(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: _nameController.text,
-                  phone: _phoneController.text,
-                  email: _emailController.text,
-                  totalVisits: 0,
-                );
-                
-                Provider.of<AppProvider>(context, listen: false).addCustomer(newCustomer);
-                _clearControllers();
-                Navigator.pop(ctx);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Cliente adicionado com sucesso!")),
-                );
-              }
+            onPressed: () async {
+              await _addCustomer(shopId);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
             child: const Text("GUARDAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -72,7 +117,12 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
     );
   }
 
-  Widget _buildInput(TextEditingController controller, String label, IconData icon, {TextInputType type = TextInputType.text}) {
+  Widget _buildInput(
+      TextEditingController controller,
+      String label,
+      IconData icon, {
+        TextInputType type = TextInputType.text,
+      }) {
     return TextField(
       controller: controller,
       keyboardType: type,
@@ -95,13 +145,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
     final themeColor = provider.getThemeColor();
-    
-    // Filtrar clientes pela pesquisa
-    final allCustomers = provider.customers;
-    final filteredCustomers = allCustomers.where((c) {
-      return c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             c.phone.contains(_searchQuery);
-    }).toList();
+    final shopId = int.tryParse(provider.activeBusiness?.id ?? '1') ?? 1;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -112,7 +156,6 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
       ),
       body: Column(
         children: [
-          // Barra de Pesquisa
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -128,11 +171,23 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
               ),
             ),
           ),
-          
-          // Lista
           Expanded(
-            child: filteredCustomers.isEmpty
-                ? Center(
+            child: FutureBuilder<List<dynamic>>(
+              future: _customersFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: themeColor));
+                }
+
+                final allCustomers = snapshot.data ?? [];
+                final filteredCustomers = allCustomers.where((c) {
+                  final name = (c['name'] ?? '').toString().toLowerCase();
+                  final phone = (c['phone'] ?? '').toString();
+                  return name.contains(_searchQuery.toLowerCase()) || phone.contains(_searchQuery);
+                }).toList();
+
+                if (filteredCustomers.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -141,12 +196,22 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                         const Text("Nenhum cliente encontrado.", style: TextStyle(color: Colors.grey)),
                       ],
                     ),
-                  )
-                : ListView.builder(
+                  );
+                }
+
+                return RefreshIndicator(
+                  color: themeColor,
+                  onRefresh: () async => _loadCustomers(),
+                  child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: filteredCustomers.length,
                     itemBuilder: (context, index) {
                       final customer = filteredCustomers[index];
+                      final name = customer['name'] ?? 'Cliente';
+                      final phone = customer['phone'] ?? '';
+                      final visits = customer['total_visits'] ?? 0;
+                      final id = customer['id'];
+
                       return Card(
                         color: AppColors.surface,
                         margin: const EdgeInsets.only(bottom: 10),
@@ -155,31 +220,31 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                           leading: CircleAvatar(
                             backgroundColor: themeColor.withOpacity(0.2),
                             child: Text(
-                              customer.name.substring(0, 1).toUpperCase(),
+                              name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'C',
                               style: TextStyle(color: themeColor, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          title: Text(customer.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           subtitle: Text(
-                            "${customer.phone} • ${customer.totalVisits} visitas", 
-                            style: const TextStyle(color: Colors.grey, fontSize: 12)
+                            "$phone • $visits visitas",
+                            style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => provider.removeCustomer(customer.id),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () => _deleteCustomer(id),
                           ),
-                          onTap: () {
-                            // Futuro: Abrir detalhes do cliente / histórico
-                          },
                         ),
                       );
                     },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddCustomerDialog(context),
+        onPressed: () => _showAddCustomerDialog(context, shopId),
         backgroundColor: themeColor,
         child: const Icon(Icons.person_add, color: Colors.black),
       ),

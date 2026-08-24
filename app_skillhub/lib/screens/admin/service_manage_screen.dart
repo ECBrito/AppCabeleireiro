@@ -1,9 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../../config/theme.dart';
-import '../../models/service_model.dart';
 import '../../providers/app_provider.dart';
-import '../../services/service_db_service.dart';
 
 class ServiceManageScreen extends StatefulWidget {
   const ServiceManageScreen({super.key});
@@ -13,13 +13,82 @@ class ServiceManageScreen extends StatefulWidget {
 }
 
 class _ServiceManageScreenState extends State<ServiceManageScreen> {
-  final ServiceDbService _serviceDb = ServiceDbService();
+  static const String baseUrl = 'http://10.0.2.2:3000';
+  late Future<List<dynamic>> _servicesFuture;
 
-  void _showServiceForm([ServiceModel? existingService]) {
-    final nameController = TextEditingController(text: existingService?.name ?? '');
-    final priceController = TextEditingController(text: existingService?.price.toString() ?? '');
-    final durationController = TextEditingController(text: existingService?.durationMinutes.toString() ?? '30');
-    final descController = TextEditingController(text: existingService?.description ?? '');
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  void _loadServices() {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(appProvider.activeBusiness?.id ?? '1') ?? 1;
+    setState(() {
+      _servicesFuture = _fetchServices(shopId);
+    });
+  }
+
+  Future<List<dynamic>> _fetchServices(int shopId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/services?shopId=$shopId'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _saveService({
+    int? id,
+    required String name,
+    required double price,
+    required int duration,
+    required String desc,
+    required int shopId,
+  }) async {
+    try {
+      final headers = {'Content-Type': 'application/json'};
+      final body = jsonEncode({
+        'shop_id': shopId,
+        'name': name,
+        'price': price,
+        'duration_minutes': duration,
+        'description': desc,
+      });
+
+      if (id == null) {
+        await http.post(Uri.parse('$baseUrl/services'), headers: headers, body: body);
+      } else {
+        await http.put(Uri.parse('$baseUrl/services/$id'), headers: headers, body: body);
+      }
+      _loadServices();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro ao gravar serviço: $e"), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteService(int id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/services/$id'));
+      if (response.statusCode == 200) {
+        _loadServices();
+      }
+    } catch (_) {}
+  }
+
+  void _showServiceForm(int shopId, [Map<String, dynamic>? existingService]) {
+    final nameController = TextEditingController(text: existingService?['name'] ?? '');
+    final priceController = TextEditingController(text: existingService?['price']?.toString() ?? '');
+    final durationController = TextEditingController(
+      text: existingService?['duration_minutes']?.toString() ?? '30',
+    );
+    final descController = TextEditingController(text: existingService?['description'] ?? '');
 
     showModalBottomSheet(
       context: context,
@@ -107,19 +176,14 @@ class _ServiceManageScreenState extends State<ServiceManageScreen> {
 
                       if (name.isEmpty) return;
 
-                      final service = ServiceModel(
-                        id: existingService?.id ?? 0,
+                      await _saveService(
+                        id: existingService?['id'],
                         name: name,
                         price: price,
-                        durationMinutes: duration,
-                        description: desc,
+                        duration: duration,
+                        desc: desc,
+                        shopId: shopId,
                       );
-
-                      if (existingService == null) {
-                        await _serviceDb.addService(service);
-                      } else {
-                        await _serviceDb.updateService(service);
-                      }
 
                       if (ctx.mounted) Navigator.pop(ctx);
                     },
@@ -145,6 +209,7 @@ class _ServiceManageScreenState extends State<ServiceManageScreen> {
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context);
     final themeColor = appProvider.getThemeColor();
+    final shopId = int.tryParse(appProvider.activeBusiness?.id ?? '1') ?? 1;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -153,8 +218,8 @@ class _ServiceManageScreenState extends State<ServiceManageScreen> {
         backgroundColor: AppColors.background,
         iconTheme: IconThemeData(color: themeColor),
       ),
-      body: StreamBuilder<List<ServiceModel>>(
-        stream: _serviceDb.getServicesStream(),
+      body: FutureBuilder<List<dynamic>>(
+        future: _servicesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: themeColor));
@@ -174,49 +239,57 @@ class _ServiceManageScreenState extends State<ServiceManageScreen> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(20),
-            itemCount: services.length,
-            itemBuilder: (context, index) {
-              final service = services[index];
-              return Card(
-                color: const Color(0xFF1E1E1E),
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  title: Text(
-                    service.name,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          return RefreshIndicator(
+            color: themeColor,
+            onRefresh: () async => _loadServices(),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: services.length,
+              itemBuilder: (context, index) {
+                final service = services[index];
+                final price = double.tryParse(service['price']?.toString() ?? '0.0') ?? 0.0;
+                final duration = service['duration_minutes'] ?? 30;
+                final desc = service['description'] ?? '';
+
+                return Card(
+                  color: const Color(0xFF1E1E1E),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    title: Text(
+                      service['name'] ?? '',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      "$duration min • $desc",
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${price.toStringAsFixed(2)}€",
+                          style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.grey),
+                          onPressed: () => _showServiceForm(shopId, service),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () => _deleteService(service['id']),
+                        ),
+                      ],
+                    ),
                   ),
-                  subtitle: Text(
-                    "${service.durationMinutes} min • ${service.description}",
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "${service.price.toStringAsFixed(2)}€",
-                        style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.grey),
-                        onPressed: () => _showServiceForm(service),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () => _serviceDb.deleteService(service.id),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showServiceForm(),
+        onPressed: () => _showServiceForm(shopId),
         backgroundColor: themeColor,
         child: const Icon(Icons.add, color: Colors.black),
       ),

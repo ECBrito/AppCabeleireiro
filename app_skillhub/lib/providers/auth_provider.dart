@@ -78,6 +78,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  void setUserFromMap(Map<String, dynamic> userMap) {
+    if (userMap.isEmpty) return;
+    _userModel = UserModel.fromJson(userMap);
+    _authService.setCurrentUserFromMap(userMap);
+    notifyListeners();
+  }
+
   Future<void> updateProfile({String? name, String? phone}) async {
     if (_userModel == null) return;
     _setLoading(true);

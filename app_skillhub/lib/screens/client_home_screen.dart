@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/theme.dart';
 import '../models/business_model.dart';
 import '../providers/app_provider.dart';
+import '../services/shop_service.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
 import 'notifications_screen.dart';
@@ -31,10 +31,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   ];
 
   final List<Map<String, dynamic>> _topBarbers = [
-    {'name': 'Carlos', 'rating': 5.0, 'image': 'https://randomuser.me/api/portraits/men/32.jpg'},
-    {'name': 'Sofia', 'rating': 4.9, 'image': 'https://randomuser.me/api/portraits/women/44.jpg'},
-    {'name': 'André', 'rating': 4.8, 'image': 'https://randomuser.me/api/portraits/men/85.jpg'},
-    {'name': 'Ana', 'rating': 4.9, 'image': 'https://randomuser.me/api/portraits/women/60.jpg'},
+    {
+      'name': 'Carlos',
+      'rating': 5.0,
+      'image': 'https://randomuser.me/api/portraits/men/32.jpg',
+    },
+    {
+      'name': 'Sofia',
+      'rating': 4.9,
+      'image': 'https://randomuser.me/api/portraits/women/44.jpg',
+    },
+    {
+      'name': 'André',
+      'rating': 4.8,
+      'image': 'https://randomuser.me/api/portraits/men/85.jpg',
+    },
+    {
+      'name': 'Ana',
+      'rating': 4.9,
+      'image': 'https://randomuser.me/api/portraits/women/60.jpg',
+    },
   ];
 
   @override
@@ -71,19 +87,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const FavoritesScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const FavoritesScreen(),
+                ),
               );
             },
           ),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                ),
                 tooltip: 'Notificações',
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
                   );
                 },
               ),
@@ -93,9 +116,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              )
+              ),
             ],
           ),
           Padding(
@@ -104,15 +130,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
                 );
               },
               child: Container(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: AppColors.gold,
+                  shape: BoxShape.circle,
+                ),
                 child: const CircleAvatar(
                   radius: 16,
-                  backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/32.jpg'),
+                  backgroundImage: NetworkImage(
+                    'https://randomuser.me/api/portraits/men/32.jpg',
+                  ),
                   backgroundColor: Color(0xFF1E1E1E),
                 ),
               ),
@@ -143,12 +176,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.grey),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = "");
-                    },
-                  )
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = "");
+                          },
+                        )
                       : null,
                 ),
               ),
@@ -174,11 +207,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                             duration: const Duration(milliseconds: 300),
                             padding: const EdgeInsets.all(15),
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.gold : const Color(0xFF1E1E1E),
+                              color: isSelected
+                                  ? AppColors.gold
+                                  : const Color(0xFF1E1E1E),
                               shape: BoxShape.circle,
-                              border: isSelected ? null : Border.all(color: Colors.white10),
+                              border: isSelected
+                                  ? null
+                                  : Border.all(color: Colors.white10),
                               boxShadow: isSelected
-                                  ? [BoxShadow(color: AppColors.gold.withOpacity(0.4), blurRadius: 10)]
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.gold.withOpacity(0.4),
+                                        blurRadius: 10,
+                                      ),
+                                    ]
                                   : [],
                             ),
                             child: Icon(
@@ -193,7 +235,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                             style: TextStyle(
                               color: isSelected ? AppColors.gold : Colors.grey,
                               fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -213,8 +257,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  _buildPromoCard(const Color(0xFF9C27B0), "Semana do Estudante", "20% OFF"),
-                  _buildPromoCard(const Color(0xFF2196F3), "Indique um Amigo", "Ganhe 50 pts"),
+                  _buildPromoCard(
+                    const Color(0xFF9C27B0),
+                    "Semana do Estudante",
+                    "20% OFF",
+                  ),
+                  _buildPromoCard(
+                    const Color(0xFF2196F3),
+                    "Indique um Amigo",
+                    "Ganhe 50 pts",
+                  ),
                 ],
               ),
             ),
@@ -227,8 +279,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Top Profissionais", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
-                  const Text("Ver todos", style: TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold)),
+                  Text(
+                    "Top Profissionais",
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                  ),
+                  const Text(
+                    "Ver todos",
+                    style: TextStyle(
+                      color: AppColors.gold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -259,12 +322,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         const SizedBox(height: 5),
                         Text(
                           barber['name'],
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 10),
-                            Text(" ${barber['rating']}", style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 10,
+                            ),
+                            Text(
+                              " ${barber['rating']}",
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 10,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -276,34 +353,59 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
             const SizedBox(height: 20),
 
-            // LISTA DE LOJAS REAL DA FIRESTORE / MOCK FALLBACK
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'owner').snapshots(),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: ShopService.getShops(),
               builder: (context, snapshot) {
-                List<Business> shops = [];
-
-                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                  shops = snapshot.data!.docs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return Business(
-                      id: doc.id,
-                      name: data['name'] ?? 'Barbearia / Salão',
-                      type: BusinessType.values.first, // <--- Usa automaticamente o primeiro tipo definido no Enum
-                      code: doc.id.substring(0, 4).toUpperCase(),
-                      colorHex: 0xFFFFD700,
-                      address: data['address'] ?? 'Rua Principal, Beja',
-                      rating: 4.9,
-                      coverImage: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-                    );
-                  }).toList();
-                } else {
-                  // Caso não haja registos ainda no Firestore, usa os dados mock para a UI não ficar vazia
-                  shops = mockBusinesses;
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(color: AppColors.gold),
+                    ),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Text(
+                        "Erro ao carregar lojas:\n${snapshot.error}",
+                        style: const TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
                 }
 
-                final filteredShops = shops.where((shop) {
-                  return shop.name.toLowerCase().contains(_searchQuery.toLowerCase());
-                }).toList();
+                final List<Map<String, dynamic>> shopsData =
+                    snapshot.data ?? [];
+
+                // Converte os dados da BD para o modelo Business
+                final shops = shopsData
+                    .map((data) {
+                      return Business(
+                        id: data['id'].toString(),
+                        name: data['name'] ?? 'Barbearia',
+                        type: BusinessType.values.first,
+                        code: 'SKILL',
+                        colorHex: 0xFFFFD700,
+                        address: data['address'] ?? 'Beja',
+                        rating:
+                            double.tryParse(
+                              data['rating']?.toString() ?? '5.0',
+                            ) ??
+                            5.0,
+                        coverImage:
+                            data['cover_image'] ??
+                            'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+                      );
+                    })
+                    .where((shop) {
+                      return shop.name.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      );
+                    })
+                    .toList();
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,32 +415,38 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text("Recomendados", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
-                          Text("${filteredShops.length} locais", style: const TextStyle(color: Colors.grey)),
+                          Text(
+                            "Recomendados (Postgres)",
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: Colors.white),
+                          ),
+                          Text(
+                            "${shops.length} locais",
+                            style: const TextStyle(color: Colors.grey),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (filteredShops.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: Text("Nada encontrado.", style: TextStyle(color: Colors.grey)),
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: filteredShops.length,
-                        itemBuilder: (context, index) {
-                          return _buildShopCard(context, filteredShops[index])
-                              .animate()
-                              .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-                              .slideY(begin: 0.1, end: 0);
-                        },
-                      ),
+                    shops.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Text(
+                                "Sem barbearias registadas.",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: shops.length,
+                            itemBuilder: (context, index) {
+                              return _buildShopCard(context, shops[index]);
+                            },
+                          ),
                   ],
                 );
               },
@@ -370,12 +478,32 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8)),
-            child: const Text("PROMO", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              "PROMO",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           const SizedBox(height: 10),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          Text(subtitle, style: const TextStyle(color: Colors.white, fontSize: 14)),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -390,13 +518,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           color: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Color(shop.colorHex).withOpacity(0.3), width: 1),
+            side: BorderSide(
+              color: Color(shop.colorHex).withOpacity(0.3),
+              width: 1,
+            ),
           ),
           child: InkWell(
             onTap: () {
-              // Associa a loja selecionada ao AppProvider e navega para agendamento
               provider.selectShop(shop);
-              Navigator.pushNamed(context, '/booking');
+              Navigator.pushNamed(context, '/shop_details');
             },
             borderRadius: BorderRadius.circular(16),
             child: Column(
@@ -405,13 +535,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
                       child: Image.network(
                         shop.coverImage,
                         height: 150,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => Container(height: 150, color: Colors.grey[900]),
+                        errorBuilder: (c, e, s) =>
+                            Container(height: 150, color: Colors.grey[900]),
                       ),
                     ),
                     Positioned(
@@ -421,7 +554,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         onTap: () => provider.toggleFavorite(shop.id),
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
                           child: Icon(
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             color: isFavorite ? Colors.red : Colors.white,
@@ -442,23 +578,37 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         children: [
                           Text(
                             shop.name,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Color(shop.colorHex),
-                              fontSize: 18,
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Color(shop.colorHex),
+                                  fontSize: 18,
+                                ),
                           ),
                           const SizedBox(height: 4),
-                          Text(shop.address, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(
+                            shop.address,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: AppColors.gold, size: 16),
+                          const Icon(
+                            Icons.star,
+                            color: AppColors.gold,
+                            size: 16,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             shop.rating.toString(),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          )
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ],

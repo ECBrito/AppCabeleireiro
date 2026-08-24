@@ -1,9 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../../config/theme.dart';
 import '../../providers/app_provider.dart';
-import '../../models/worker_model.dart';
-import '../../services/worker_db_service.dart';
 
 class WorkersManageScreen extends StatefulWidget {
   const WorkersManageScreen({super.key});
@@ -13,10 +13,78 @@ class WorkersManageScreen extends StatefulWidget {
 }
 
 class _WorkersManageScreenState extends State<WorkersManageScreen> {
-  final WorkerDbService _workerDb = WorkerDbService();
+  static const String baseUrl = 'http://10.0.2.2:3000';
+  late Future<List<dynamic>> _workersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorkers();
+  }
+
+  void _loadWorkers() {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(appProvider.activeBusiness?.id.toString() ?? '1') ?? 1;
+    setState(() {
+      _workersFuture = _fetchWorkers(shopId);
+    });
+  }
+
+  Future<List<dynamic>> _fetchWorkers(int shopId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/workers?shopId=$shopId'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _addWorker({
+    required int shopId,
+    required String name,
+    required String role,
+    required String bio,
+  }) async {
+    try {
+      final randomImgId = 10 + (DateTime.now().second % 80);
+      final response = await http.post(
+        Uri.parse('$baseUrl/workers'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'shop_id': shopId,
+          'name': name,
+          'role': role.isNotEmpty ? role : 'Profissional',
+          'bio': bio,
+          'photo_url': 'https://randomuser.me/api/portraits/men/$randomImgId.jpg',
+          'rating': 5.0,
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        _loadWorkers();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro ao adicionar profissional: $e"), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteWorker(int id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/workers/$id'));
+      if (response.statusCode == 200) {
+        _loadWorkers();
+      }
+    } catch (_) {}
+  }
 
   void _showAddWorkerDialog(Color themeColor, int shopId) {
     final nameController = TextEditingController();
+    final roleController = TextEditingController();
     final bioController = TextEditingController();
 
     showDialog(
@@ -37,10 +105,19 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
             ),
             const SizedBox(height: 10),
             TextField(
+              controller: roleController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: "Cargo (ex: Barbeiro, Colorista)",
+                labelStyle: TextStyle(color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
               controller: bioController,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
-                labelText: "Especialidade / Bio (ex: Especialista em Barba)",
+                labelText: "Bio / Especialidade",
                 labelStyle: TextStyle(color: Colors.grey),
               ),
             ),
@@ -54,20 +131,15 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: themeColor),
             onPressed: () async {
-              if (nameController.text.trim().isNotEmpty) {
-                final newWorker = Worker(
-                  id: 0,
-                  name: nameController.text.trim(),
-                  photoUrl: 'https://randomuser.me/api/portraits/men/${(10 + DateTime.now().second % 80)}.jpg',
-                  rating: 5.0,
+              final name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                await _addWorker(
                   shopId: shopId,
+                  name: name,
+                  role: roleController.text.trim(),
                   bio: bioController.text.trim(),
                 );
-                await _workerDb.addWorker(newWorker);
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  setState(() {});
-                }
+                if (ctx.mounted) Navigator.pop(ctx);
               }
             },
             child: const Text("GUARDAR", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -90,8 +162,8 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
         backgroundColor: AppColors.background,
         iconTheme: IconThemeData(color: themeColor),
       ),
-      body: StreamBuilder<List<Worker>>(
-        stream: _workerDb.getWorkersStream(shopId: shopId),
+      body: FutureBuilder<List<dynamic>>(
+        future: _workersFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator(color: themeColor));
@@ -105,34 +177,41 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(20),
-            itemCount: workers.length,
-            itemBuilder: (context, index) {
-              final worker = workers[index];
-              return Card(
-                color: AppColors.surface,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: NetworkImage(worker.photoUrl),
+          return RefreshIndicator(
+            color: themeColor,
+            onRefresh: () async => _loadWorkers(),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: workers.length,
+              itemBuilder: (context, index) {
+                final worker = workers[index];
+                final id = worker['id'];
+                final name = worker['name'] ?? 'Profissional';
+                final role = worker['role'] ?? 'Colaborador';
+                final photoUrl = worker['photo_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg';
+                final rating = worker['rating'] ?? 5.0;
+
+                return Card(
+                  color: AppColors.surface,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: NetworkImage(photoUrl),
+                    ),
+                    title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                      "$role • ⭐ $rating",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                      onPressed: () => _deleteWorker(id),
+                    ),
                   ),
-                  title: Text(worker.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  subtitle: Text(
-                    worker.bio.isNotEmpty ? worker.bio : "⭐ ${worker.rating}",
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () async {
-                      await _workerDb.deleteWorker(worker.id);
-                      setState(() {});
-                    },
-                  ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),

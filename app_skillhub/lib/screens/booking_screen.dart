@@ -1,14 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
-import '../models/appointment_model.dart';
-import '../models/service_model.dart';
-import '../models/worker_model.dart';
-import '../services/service_db_service.dart';
-import '../services/booking_db_service.dart';
-import '../services/worker_db_service.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
@@ -18,27 +14,45 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
   String? _selectedServiceName;
   double _selectedServicePrice = 0.0;
-  Worker? _selectedWorker;
+  Map<String, dynamic>? _selectedWorker;
   bool _isSubmitting = false;
-
-  final ServiceDbService _serviceDb = ServiceDbService();
-  final BookingDbService _bookingDb = BookingDbService();
-  final WorkerDbService _workerDb = WorkerDbService();
 
   final List<String> _timeSlots = [
     "09:00", "09:30", "10:00", "10:30", "11:00",
     "14:00", "14:30", "15:00", "15:30", "16:00", "17:00", "17:30", "18:00"
   ];
 
-  Future<void> _confirmBooking() async {
+  Future<List<dynamic>> _fetchWorkers(int shopId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/workers?shopId=$shopId'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<List<dynamic>> _fetchServices(int shopId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/services?shopId=$shopId'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _confirmBooking(int shopId) async {
     if (_selectedTime == null || _selectedServiceName == null || _selectedWorker == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Por favor escolhe um Profissional, Serviço e Horário.'),
+          content: Text('Por favor escolhe um Profissional, Serviço e Horário.'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -49,30 +63,35 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final appProvider = Provider.of<AppProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Nome do utilizador autenticado (ou fallback para o email/Cliente)
       final clientName = authProvider.userModel?.name.isNotEmpty == true
           ? authProvider.userModel!.name
           : (authProvider.currentUser?.email ?? "Cliente");
 
-      final newAppointment = Appointment(
-        id: 0,
-        clientId: authProvider.userModel?.id,
-        clientName: clientName,
-        serviceName: _selectedServiceName!,
-        price: _selectedServicePrice,
-        date: _selectedDate,
-        time: _selectedTime!,
-        shopId: 1,
-        workerId: _selectedWorker!.id,
-        workerName: _selectedWorker!.name,
-        status: AppointmentStatus.pending,
+      final formattedDate = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/bookings'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'client_id': authProvider.userModel?.id,
+          'client_name': clientName,
+          'shop_id': shopId,
+          'worker_id': _selectedWorker!['id'],
+          'worker_name': _selectedWorker!['name'],
+          'service_name': _selectedServiceName,
+          'price': _selectedServicePrice,
+          'booking_date': formattedDate,
+          'booking_time': _selectedTime,
+          'status': 'pending',
+        }),
       );
 
-      // Guardar diretamente no Firestore
-      await _bookingDb.createBooking(newAppointment);
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Erro ao criar agendamento');
+      }
 
       if (!mounted) return;
 
@@ -84,7 +103,7 @@ class _BookingScreenState extends State<BookingScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
           content: Text(
-            "Agendado com ${_selectedWorker!.name}!\nA tua vaga está reservada.",
+            "Agendado com ${_selectedWorker!['name']}!\nA tua vaga está reservada.",
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
@@ -105,6 +124,7 @@ class _BookingScreenState extends State<BookingScreen> {
         SnackBar(
           content: Text("Erro ao agendar: $e"),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -119,6 +139,7 @@ class _BookingScreenState extends State<BookingScreen> {
     final color = provider.getThemeColor();
 
     if (biz == null) return const SizedBox();
+    final shopId = int.tryParse(biz.id) ?? 1;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -133,12 +154,11 @@ class _BookingScreenState extends State<BookingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. ESCOLHER PROFISSIONAL (STREAM FIRESTORE REAL) ---
             _buildSectionTitle("Com quem queres marcar?", color),
             const SizedBox(height: 15),
 
-            StreamBuilder<List<Worker>>(
-              stream: _workerDb.getWorkersStream(),
+            FutureBuilder<List<dynamic>>(
+              future: _fetchWorkers(shopId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator(color: color));
@@ -163,7 +183,8 @@ class _BookingScreenState extends State<BookingScreen> {
                     itemCount: workers.length,
                     itemBuilder: (context, index) {
                       final worker = workers[index];
-                      final isSelected = _selectedWorker?.id == worker.id;
+                      final isSelected = _selectedWorker?['id'] == worker['id'];
+                      final rating = double.tryParse(worker['rating']?.toString() ?? '5.0') ?? 5.0;
 
                       return GestureDetector(
                         onTap: () => setState(() => _selectedWorker = worker),
@@ -186,12 +207,14 @@ class _BookingScreenState extends State<BookingScreen> {
                                 child: CircleAvatar(
                                   radius: 35,
                                   backgroundColor: AppColors.surface,
-                                  backgroundImage: NetworkImage(worker.photoUrl),
+                                  backgroundImage: NetworkImage(
+                                    worker['photo_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                worker.name.split(' ')[0],
+                                (worker['name'] ?? 'Profissional').toString().split(' ')[0],
                                 style: TextStyle(
                                   color: isSelected ? color : Colors.white,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -200,7 +223,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               Row(
                                 children: [
                                   const Icon(Icons.star, size: 12, color: Colors.amber),
-                                  Text(" ${worker.rating}", style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                  Text(" $rating", style: const TextStyle(color: Colors.grey, fontSize: 10)),
                                 ],
                               )
                             ],
@@ -215,12 +238,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
             const Divider(color: Colors.white10, height: 40),
 
-            // --- 2. ESCOLHER SERVIÇO (STREAM DO FIRESTORE) ---
             _buildSectionTitle("Qual o serviço?", color),
             const SizedBox(height: 10),
 
-            StreamBuilder<List<ServiceModel>>(
-              stream: _serviceDb.getServicesStream(),
+            FutureBuilder<List<dynamic>>(
+              future: _fetchServices(shopId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator(color: color));
@@ -236,31 +258,37 @@ class _BookingScreenState extends State<BookingScreen> {
                 }
 
                 return Column(
-                  children: services.map((service) => RadioListTile<String>(
-                    activeColor: color,
-                    contentPadding: EdgeInsets.zero,
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(service.name, style: const TextStyle(color: Colors.white)),
-                        Text("${service.price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    subtitle: Text("${service.durationMinutes} min • ${service.description}", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                    value: service.name,
-                    groupValue: _selectedServiceName,
-                    onChanged: (value) => setState(() {
-                      _selectedServiceName = value;
-                      _selectedServicePrice = service.price;
-                    }),
-                  )).toList(),
+                  children: services.map((service) {
+                    final name = service['name'] ?? '';
+                    final price = double.tryParse(service['price']?.toString() ?? '0.0') ?? 0.0;
+                    final duration = service['duration_minutes'] ?? 30;
+                    final description = service['description'] ?? '';
+
+                    return RadioListTile<String>(
+                      activeColor: color,
+                      contentPadding: EdgeInsets.zero,
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(name, style: const TextStyle(color: Colors.white)),
+                          Text("${price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      subtitle: Text("$duration min • $description", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      value: name,
+                      groupValue: _selectedServiceName,
+                      onChanged: (value) => setState(() {
+                        _selectedServiceName = value;
+                        _selectedServicePrice = price;
+                      }),
+                    );
+                  }).toList(),
                 );
               },
             ),
 
             const SizedBox(height: 30),
 
-            // --- 3. ESCOLHER DATA E HORA ---
             _buildSectionTitle("Quando?", color),
             const SizedBox(height: 15),
 
@@ -291,8 +319,8 @@ class _BookingScreenState extends State<BookingScreen> {
                   selectedColor: color,
                   backgroundColor: AppColors.surface,
                   labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.bold
+                    color: isSelected ? Colors.black : Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -305,7 +333,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
             const SizedBox(height: 50),
 
-            // --- 4. TOTAL E BOTÃO ---
             if (_selectedServicePrice > 0)
               Padding(
                 padding: const EdgeInsets.only(bottom: 20),
@@ -324,7 +351,7 @@ class _BookingScreenState extends State<BookingScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _confirmBooking,
+                onPressed: _isSubmitting ? null : () => _confirmBooking(shopId),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: color,
                   foregroundColor: Colors.black,
@@ -333,7 +360,11 @@ class _BookingScreenState extends State<BookingScreen> {
                   shadowColor: color.withOpacity(0.5),
                 ),
                 child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.black)
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                )
                     : const Text("CONFIRMAR AGENDAMENTO", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),

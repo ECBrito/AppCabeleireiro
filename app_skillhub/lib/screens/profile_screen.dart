@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/app_provider.dart';
@@ -12,20 +14,22 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
   bool _isEditing = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     final auth = Provider.of<AuthProvider>(context, listen: false);
 
-    // Inicializa com os dados do Firestore vindos do UserModel
     _nameController = TextEditingController(text: auth.userModel?.name ?? "");
     _emailController = TextEditingController(text: auth.userModel?.email ?? "");
-    _phoneController = TextEditingController(text: auth.userModel?.phone ?? ""); // Ou campo de telefone se tiveres no model
+    _phoneController = TextEditingController(text: auth.userModel?.phone ?? "");
   }
 
   @override
@@ -36,35 +40,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  void _saveProfile() async {
+  Future<void> _saveProfile() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userId = auth.userModel?.id;
+
+    if (userId == null) return;
+
+    setState(() => _isSaving = true);
 
     try {
-      await auth.updateProfile(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/profile/$userId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+        }),
       );
 
-      if (mounted) {
-        setState(() => _isEditing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Perfil atualizado com sucesso!"),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['user'] != null) {
+          auth.setUserFromMap(data['user']);
+        }
+
+        if (mounted) {
+          setState(() => _isEditing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Perfil atualizado com sucesso!"),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        throw Exception("Erro ao guardar dados.");
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Erro ao atualizar perfil. Tenta novamente."),
+          SnackBar(
+            content: Text("Erro ao atualizar perfil: $e"),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -73,7 +97,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final auth = Provider.of<AuthProvider>(context);
     final appProvider = Provider.of<AppProvider>(context);
 
-    // Dados da loja atual (para mostrar de onde estamos a sair)
     final currentShop = appProvider.activeBusiness;
     final themeColor = appProvider.getThemeColor();
 
@@ -85,8 +108,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         iconTheme: IconThemeData(color: themeColor),
         actions: [
           IconButton(
-            icon: Icon(_isEditing ? Icons.check : Icons.edit, color: themeColor),
-            onPressed: () {
+            icon: _isSaving
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+                : Icon(_isEditing ? Icons.check : Icons.edit, color: themeColor),
+            onPressed: _isSaving
+                ? null
+                : () {
               if (_isEditing) {
                 _saveProfile();
               } else {
@@ -100,7 +131,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // FOTO DE PERFIL
             Stack(
               alignment: Alignment.bottomRight,
               children: [
@@ -128,14 +158,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             _buildProfileField("Nome Completo", _nameController, Icons.person, themeColor, isEditable: _isEditing),
             const SizedBox(height: 20),
-            // O Email fica desativado para edição para evitar dessincronização com a conta do Firebase Auth
             _buildProfileField("Email", _emailController, Icons.email, themeColor, isEditable: false),
             const SizedBox(height: 20),
             _buildProfileField("Telemóvel", _phoneController, Icons.phone, themeColor, isEditable: _isEditing),
 
             const SizedBox(height: 40),
 
-            // --- ÁREA DE VINCULAÇÃO ---
             if (currentShop != null) ...[
               Container(
                 padding: const EdgeInsets.all(20),
@@ -162,10 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          // AÇÃO DE DESVINCULAR
-                          appProvider.unlinkBusiness();
-                        },
+                        onPressed: () => appProvider.unlinkBusiness(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: BorderSide(color: Colors.red.withOpacity(0.5)),
@@ -180,7 +205,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 30),
             ],
 
-            // BOTÃO TERMINAR SESSÃO (Conta SkillHub)
             SizedBox(
               width: double.infinity,
               child: TextButton.icon(
@@ -204,9 +228,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       String label,
       TextEditingController controller,
       IconData icon,
-      Color color,
-      {required bool isEditable}
-      ) {
+      Color color, {
+        required bool isEditable,
+      }) {
     return TextField(
       controller: controller,
       enabled: isEditable,
@@ -218,8 +242,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         filled: true,
         fillColor: const Color(0xFF1E1E1E),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+        disabledBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
           borderSide: BorderSide(color: Colors.white10),
         ),
       ),
