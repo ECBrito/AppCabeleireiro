@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../models/business_model.dart';
 import '../models/service_model.dart';
 import '../models/appointment_model.dart';
@@ -7,6 +9,8 @@ import '../models/customer_model.dart';
 import '../models/promotion_model.dart';
 
 class AppProvider with ChangeNotifier {
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
   // ESTADO
   Business? _activeBusiness;
   final List<Appointment> _appointments = [];
@@ -16,12 +20,13 @@ class AppProvider with ChangeNotifier {
   Business? get activeBusiness => _activeBusiness;
   bool get isLinked => _activeBusiness != null;
   List<Appointment> get appointments => _appointments;
+  Set<String> get favoriteIds => _favoriteIds;
 
   // Lista de Clientes
   final List<Customer> _customers = [...mockCustomers];
   List<Customer> get customers => _customers;
 
-  // Lista de Serviços (agora a usar a classe ServiceModel)
+  // Lista de Serviços
   final List<ServiceModel> _services = [
     ServiceModel(id: 1, name: 'Serviço Premium', price: 25.0, durationMinutes: 60),
     ServiceModel(id: 2, name: 'Serviço Rápido', price: 15.0, durationMinutes: 30),
@@ -51,19 +56,71 @@ class AppProvider with ChangeNotifier {
 
   BarberShop? get currentShop => _activeBusiness != null
       ? BarberShop(
-      id: _activeBusiness!.id,
-      name: _activeBusiness!.name,
-      primaryColor: _activeBusiness!.colorHex.toRadixString(16),
-      logoIcon: 'cut',
-      address: _activeBusiness!.address,
-      rating: _activeBusiness!.rating
+    id: _activeBusiness!.id,
+    name: _activeBusiness!.name,
+    primaryColor: _activeBusiness!.colorHex.toRadixString(16),
+    logoIcon: 'cut',
+    address: _activeBusiness!.address,
+    rating: _activeBusiness!.rating,
   )
       : null;
 
+  // --- GESTÃO DE FAVORITOS (HTTP + POSTGRESQL) ---
+
+  bool isFavorite(String id) => _favoriteIds.contains(id);
+
+  // 1. Carregar favoritos da BD
+  Future<void> loadFavorites(int userId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/favorites/$userId'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        _favoriteIds.clear();
+        for (var item in data) {
+          _favoriteIds.add(item['id'].toString());
+        }
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  // 2. Alternar favorito (Toggle na BD)
+  Future<bool> toggleFavoriteHttp(int userId, String shopId) async {
+    try {
+      final intShopId = int.tryParse(shopId) ?? 1;
+      final response = await http.post(
+        Uri.parse('$baseUrl/favorites/toggle'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': userId, 'shopId': intShopId}),
+      );
+
+      if (response.statusCode == 200) {
+        final res = jsonDecode(response.body);
+        final bool isFav = res['isFavorite'] == true;
+
+        if (isFav) {
+          _favoriteIds.add(shopId);
+        } else {
+          _favoriteIds.remove(shopId);
+        }
+        notifyListeners();
+        return isFav;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  void toggleFavorite(String id) {
+    if (_favoriteIds.contains(id)) {
+      _favoriteIds.remove(id);
+    } else {
+      _favoriteIds.add(id);
+    }
+    notifyListeners();
+  }
 
   // --- LÓGICA DE ANALYTICS AVANÇADA ---
 
-  // 1. Filtrar por Período
   List<Appointment> getAppointmentsByPeriod(String period) {
     final now = DateTime.now();
     return _appointments.where((appt) {
@@ -75,23 +132,20 @@ class AppProvider with ChangeNotifier {
       } else if (period == 'Ano') {
         return appt.date.year == now.year;
       }
-      return true; // Todos
+      return true;
     }).toList();
   }
 
-  // 2. Calcular Faturação por Período
   double getRevenueByPeriod(String period) {
     final filtered = getAppointmentsByPeriod(period);
     return filtered.fold(0.0, (sum, item) => sum + item.price);
   }
 
-  // 3. Calcular Crescimento
   double getGrowthPercentage(String period) {
     if (_appointments.isEmpty) return 0.0;
     return 12.5;
   }
 
-  // 4. Top Serviços
   List<Map<String, dynamic>> getTopServices() {
     final Map<String, int> counts = {};
 
@@ -113,7 +167,6 @@ class AppProvider with ChangeNotifier {
     return result;
   }
 
-  // 5. Dados para o Gráfico
   List<double> getWeeklyChartData() {
     List<double> data = [0, 0, 0, 0, 0, 0, 0];
     if (_appointments.isEmpty) return [0.1, 0.3, 0.2, 0.5, 0.4, 0.8, 0.6];
@@ -130,7 +183,6 @@ class AppProvider with ChangeNotifier {
     return data.map((e) => e / max).toList();
   }
 
-
   // --- MÉTODOS DE AÇÃO ---
 
   void addPromotion(Promotion promo) { promotions.add(promo); notifyListeners(); }
@@ -138,7 +190,6 @@ class AppProvider with ChangeNotifier {
   void addCustomer(Customer customer) { _customers.add(customer); notifyListeners(); }
   void removeCustomer(String id) { _customers.removeWhere((c) => c.id == id); notifyListeners(); }
 
-  // Atualizados para ServiceModel
   void addService(ServiceModel service) { _services.add(service); notifyListeners(); }
   void removeService(int id) {
     _services.removeWhere((s) => s.id == id);
@@ -186,13 +237,6 @@ class AppProvider with ChangeNotifier {
   void addAppointment(Appointment appt) { _appointments.add(appt); notifyListeners(); }
 
   double get totalRevenue => _appointments.fold(0.0, (sum, item) => sum + item.price);
-
-  bool isFavorite(String id) => _favoriteIds.contains(id);
-  void toggleFavorite(String id) {
-    if(_favoriteIds.contains(id)) _favoriteIds.remove(id);
-    else _favoriteIds.add(id);
-    notifyListeners();
-  }
 }
 
 // Classe Auxiliar
@@ -210,7 +254,7 @@ class BarberShop {
     required this.primaryColor,
     required this.logoIcon,
     required this.address,
-    required this.rating
+    required this.rating,
   });
 
   Color get color => Color(int.parse(primaryColor, radix: 16) + 0xFF000000);

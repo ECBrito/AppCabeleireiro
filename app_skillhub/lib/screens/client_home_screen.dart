@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../config/theme.dart';
 import '../models/business_model.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/shop_service.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
@@ -52,6 +53,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       'image': 'https://randomuser.me/api/portraits/women/60.jpg',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final app = Provider.of<AppProvider>(context, listen: false);
+      if (auth.userModel?.id != null) {
+        app.loadFavorites(auth.userModel!.id);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -176,12 +189,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.grey),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = "");
-                          },
-                        )
+                    icon: const Icon(Icons.clear, color: Colors.grey),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = "");
+                    },
+                  )
                       : null,
                 ),
               ),
@@ -216,11 +229,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                   : Border.all(color: Colors.white10),
                               boxShadow: isSelected
                                   ? [
-                                      BoxShadow(
-                                        color: AppColors.gold.withOpacity(0.4),
-                                        blurRadius: 10,
-                                      ),
-                                    ]
+                                BoxShadow(
+                                  color: AppColors.gold.withOpacity(0.4),
+                                  blurRadius: 10,
+                                ),
+                              ]
                                   : [],
                             ),
                             child: Icon(
@@ -353,6 +366,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
             const SizedBox(height: 20),
 
+            // LISTA DE LOJAS DO POSTGRESQL
             FutureBuilder<List<Map<String, dynamic>>>(
               future: ShopService.getShops(),
               builder: (context, snapshot) {
@@ -380,31 +394,31 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 final List<Map<String, dynamic>> shopsData =
                     snapshot.data ?? [];
 
-                // Converte os dados da BD para o modelo Business
                 final shops = shopsData
                     .map((data) {
-                      return Business(
-                        id: data['id'].toString(),
-                        name: data['name'] ?? 'Barbearia',
-                        type: BusinessType.values.first,
-                        code: 'SKILL',
-                        colorHex: 0xFFFFD700,
-                        address: data['address'] ?? 'Beja',
-                        rating:
-                            double.tryParse(
-                              data['rating']?.toString() ?? '5.0',
-                            ) ??
-                            5.0,
-                        coverImage:
-                            data['cover_image'] ??
-                            'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-                      );
-                    })
+                  final colorHex = int.tryParse(data['color_hex']?.toString() ?? '') ?? 0xFFFFD700;
+                  return Business(
+                    id: data['id'].toString(),
+                    name: data['name'] ?? 'Barbearia',
+                    type: BusinessType.values.first,
+                    code: data['code'] ?? 'SKILL',
+                    colorHex: colorHex,
+                    address: data['address'] ?? 'Beja',
+                    rating:
+                    double.tryParse(
+                      data['rating']?.toString() ?? '5.0',
+                    ) ??
+                        5.0,
+                    coverImage:
+                    data['cover_image'] ??
+                        'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+                  );
+                })
                     .where((shop) {
-                      return shop.name.toLowerCase().contains(
-                        _searchQuery.toLowerCase(),
-                      );
-                    })
+                  return shop.name.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  );
+                })
                     .toList();
 
                 return Column(
@@ -416,7 +430,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Recomendados (Postgres)",
+                            "Recomendados",
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(color: Colors.white),
                           ),
@@ -430,23 +444,23 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     const SizedBox(height: 10),
                     shops.isEmpty
                         ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(40),
-                              child: Text(
-                                "Sem barbearias registadas.",
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ),
-                          )
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Text(
+                          "Sem barbearias registadas.",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
                         : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: shops.length,
-                            itemBuilder: (context, index) {
-                              return _buildShopCard(context, shops[index]);
-                            },
-                          ),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: shops.length,
+                      itemBuilder: (context, index) {
+                        return _buildShopCard(context, shops[index]);
+                      },
+                    ),
                   ],
                 );
               },
@@ -510,9 +524,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   Widget _buildShopCard(BuildContext context, Business shop) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, child) {
+    return Consumer2<AppProvider, AuthProvider>(
+      builder: (context, provider, auth, child) {
         final isFavorite = provider.isFavorite(shop.id);
+        final userId = auth.userModel?.id;
+
         return Card(
           margin: const EdgeInsets.only(bottom: 20),
           color: const Color(0xFF1E1E1E),
@@ -551,7 +567,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       top: 10,
                       right: 10,
                       child: GestureDetector(
-                        onTap: () => provider.toggleFavorite(shop.id),
+                        onTap: () async {
+                          if (userId != null) {
+                            await provider.toggleFavoriteHttp(userId, shop.id);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Inicia sessão para guardar favoritos."),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: const BoxDecoration(
@@ -580,9 +607,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                             shop.name,
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
-                                  color: Color(shop.colorHex),
-                                  fontSize: 18,
-                                ),
+                              color: Color(shop.colorHex),
+                              fontSize: 18,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(

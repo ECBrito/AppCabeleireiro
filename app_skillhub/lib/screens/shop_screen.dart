@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:http/http.dart' as http;
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
 import '../config/theme.dart';
 import '../models/business_model.dart';
 
@@ -38,6 +39,7 @@ class ShopScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
     final Business? shop = provider.activeBusiness;
 
     if (shop == null) {
@@ -49,6 +51,8 @@ class ShopScreen extends StatelessWidget {
 
     final themeColor = Color(shop.colorHex);
     final shopId = int.tryParse(shop.id) ?? 1;
+    final isFav = provider.isFavorite(shop.id);
+    final userId = authProvider.userModel?.id;
 
     final List<String> galleryImages = [
       'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?q=80&w=400',
@@ -61,7 +65,7 @@ class ShopScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // 1. CABEÇALHO
+          // 1. CABEÇALHO COM BOTÃO DE FAVORITO
           SliverAppBar(
             expandedHeight: 280.0,
             floating: false,
@@ -70,6 +74,42 @@ class ShopScreen extends StatelessWidget {
             iconTheme: IconThemeData(color: themeColor),
             automaticallyImplyLeading: !isHomeMode,
             actions: [
+              // BOTÃO FAVORITO (CORAÇÃO)
+              IconButton(
+                icon: Icon(
+                  isFav ? Icons.favorite : Icons.favorite_border,
+                  color: isFav ? Colors.redAccent : Colors.white,
+                ),
+                tooltip: isFav ? "Remover dos Favoritos" : "Adicionar aos Favoritos",
+                onPressed: () async {
+                  if (userId != null) {
+                    final newState = await provider.toggleFavoriteHttp(userId, shop.id);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            newState
+                                ? "Adicionado aos favoritos!"
+                                : "Removido dos favoritos.",
+                          ),
+                          duration: const Duration(seconds: 1),
+                          backgroundColor: newState ? Colors.green : Colors.grey[800],
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Inicia sessão para guardar favoritos."),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+
               if (!isHomeMode)
                 TextButton.icon(
                   onPressed: () async {
@@ -78,10 +118,10 @@ class ShopScreen extends StatelessWidget {
                       Navigator.popUntil(context, (route) => route.isFirst);
                     }
                   },
-                  icon: const Icon(Icons.push_pin, color: Colors.white),
+                  icon: const Icon(Icons.push_pin, color: Colors.white, size: 18),
                   label: const Text(
                     "USAR ESTA APP",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   style: TextButton.styleFrom(backgroundColor: themeColor.withOpacity(0.2)),
                 ),
@@ -125,7 +165,6 @@ class ShopScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avaliação e Estado
                   Row(
                     children: [
                       Icon(Icons.star, color: themeColor, size: 20),
@@ -151,7 +190,6 @@ class ShopScreen extends StatelessWidget {
 
                   const SizedBox(height: 25),
 
-                  // Botões de Ação
                   Row(
                     children: [
                       Expanded(child: _buildActionButton(Icons.call, "Ligar", themeColor)),
@@ -164,7 +202,6 @@ class ShopScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // Sobre
                   Text("Sobre", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
                   const SizedBox(height: 10),
                   Text(
@@ -174,7 +211,6 @@ class ShopScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // Equipa (Vinda da API)
                   Text("Equipa", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
                   const SizedBox(height: 15),
                   FutureBuilder<List<dynamic>>(
@@ -224,7 +260,6 @@ class ShopScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // Galeria
                   Text("Portfólio", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
                   const SizedBox(height: 15),
                   SizedBox(
