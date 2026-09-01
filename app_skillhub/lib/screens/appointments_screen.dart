@@ -10,31 +10,31 @@ class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
 
   @override
-  State<AppointmentsScreen> createState() => _AppointmentsScreenState();
+  State<AppointmentsScreen> createState() => AppointmentsScreenState();
 }
 
-class _AppointmentsScreenState extends State<AppointmentsScreen> {
+class AppointmentsScreenState extends State<AppointmentsScreen> {
   static const String baseUrl = 'http://10.0.2.2:3000';
-  late Future<List<dynamic>> _bookingsFuture;
+  Future<List<dynamic>>? _bookingsFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadBookings();
+    loadBookings();
   }
 
-  void _loadBookings() {
+  void loadBookings() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final clientId = auth.userModel?.id;
-    _bookingsFuture = _fetchBookings(clientId);
+    setState(() {
+      _bookingsFuture = _fetchBookings(clientId);
+    });
   }
 
   Future<List<dynamic>> _fetchBookings(int? clientId) async {
+    if (clientId == null) return [];
     try {
-      final url = clientId != null
-          ? '$baseUrl/bookings?clientId=$clientId'
-          : '$baseUrl/bookings?shopId=1';
-
+      final url = '$baseUrl/bookings?clientId=$clientId';
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -59,9 +59,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
             backgroundColor: Colors.orangeAccent,
           ),
         );
-        setState(() {
-          _loadBookings();
-        });
+        loadBookings();
       }
     } catch (_) {}
   }
@@ -77,6 +75,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           backgroundColor: const Color(0xFF121212),
           centerTitle: false,
           automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: AppColors.gold),
+              tooltip: 'Atualizar',
+              onPressed: loadBookings,
+            ),
+          ],
           bottom: const TabBar(
             indicatorColor: AppColors.gold,
             labelColor: AppColors.gold,
@@ -91,30 +96,30 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           future: _bookingsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.gold),
-              );
+              return const Center(child: CircularProgressIndicator(color: AppColors.gold));
             }
 
             final all = snapshot.data ?? [];
             final now = DateTime.now();
+            final todayStr =
+                "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
+            // Próximos: Apenas confirmados ou pendentes e de hoje em diante
             final upcoming = all.where((item) {
               final status = (item['status'] ?? '').toString().toLowerCase();
               if (status == 'cancelled' || status == 'completed') return false;
-              final dateStr = item['booking_date']?.toString().split('T').first ?? '';
-              final parsedDate = DateTime.tryParse(dateStr);
-              if (parsedDate == null) return true;
-              return parsedDate.isAfter(now.subtract(const Duration(days: 1)));
+              final dateStr = (item['booking_date'] ?? '').toString().split('T').first;
+              if (dateStr.isEmpty) return true;
+              return dateStr.compareTo(todayStr) >= 0;
             }).toList();
 
+            // Histórico: Concluídos, Cancelados ou anteriores a hoje
             final history = all.where((item) {
               final status = (item['status'] ?? '').toString().toLowerCase();
               if (status == 'cancelled' || status == 'completed') return true;
-              final dateStr = item['booking_date']?.toString().split('T').first ?? '';
-              final parsedDate = DateTime.tryParse(dateStr);
-              if (parsedDate == null) return false;
-              return parsedDate.isBefore(now.subtract(const Duration(days: 1)));
+              final dateStr = (item['booking_date'] ?? '').toString().split('T').first;
+              if (dateStr.isEmpty) return false;
+              return dateStr.compareTo(todayStr) < 0;
             }).toList();
 
             return TabBarView(
@@ -131,19 +136,27 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
   Widget _buildList(BuildContext context, List<dynamic> list, bool isUpcoming) {
     if (list.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        color: AppColors.gold,
+        onRefresh: () async => loadBookings(),
+        child: ListView(
           children: [
-            Icon(
-              isUpcoming ? Icons.calendar_today : Icons.history,
-              size: 60,
-              color: Colors.grey[800],
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isUpcoming ? "Sem marcações agendadas." : "Sem histórico.",
-              style: const TextStyle(color: Colors.grey),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+            Center(
+              child: Column(
+                children: [
+                  Icon(
+                    isUpcoming ? Icons.calendar_today : Icons.history,
+                    size: 60,
+                    color: Colors.grey[800],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    isUpcoming ? "Sem marcações ativas." : "Sem histórico de serviços.",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -153,24 +166,28 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     return RefreshIndicator(
       color: AppColors.gold,
       backgroundColor: AppColors.surface,
-      onRefresh: () async {
-        setState(() {
-          _loadBookings();
-        });
-      },
+      onRefresh: () async => loadBookings(),
       child: ListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: list.length,
         itemBuilder: (context, index) {
           final item = list[index];
           final price = double.tryParse(item['price']?.toString() ?? '0.0') ?? 0.0;
-          final dateRaw = item['booking_date']?.toString().split('T').first ?? '';
-          final status = item['status'] ?? 'pending';
+          final dateRaw = (item['booking_date'] ?? '').toString().split('T').first;
+          final status = (item['status'] ?? 'pending').toString().toLowerCase();
 
           Color statusColor = AppColors.gold;
-          if (status == 'confirmed') statusColor = Colors.green;
-          if (status == 'cancelled') statusColor = Colors.redAccent;
-          if (status == 'completed') statusColor = Colors.blueGrey;
+          String statusLabel = "PENDENTE";
+          if (status == 'confirmed') {
+            statusColor = Colors.green;
+            statusLabel = "CONFIRMADO";
+          } else if (status == 'completed') {
+            statusColor = Colors.blueAccent;
+            statusLabel = "CONCLUÍDO";
+          } else if (status == 'cancelled') {
+            statusColor = Colors.redAccent;
+            statusLabel = "CANCELADO";
+          }
 
           return Container(
             margin: const EdgeInsets.only(bottom: 15),
@@ -178,13 +195,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),
               border: Border(left: BorderSide(color: statusColor, width: 4)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
             ),
             child: Column(
               children: [
@@ -208,7 +218,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          status.toString().toUpperCase(),
+                          statusLabel,
                           style: TextStyle(
                             color: statusColor,
                             fontSize: 10,
@@ -223,7 +233,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     children: [
                       const SizedBox(height: 8),
                       Text(
-                        "com ${item['worker_name'] ?? 'Profissional'}",
+                        "Profissional: ${item['worker_name'] ?? 'Barbeiro'}",
                         style: const TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                       const SizedBox(height: 8),
@@ -248,14 +258,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     ),
                   ),
                 ),
-
                 if (isUpcoming && status != 'cancelled')
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-                      ),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: Colors.white10)),
                     ),
                     child: TextButton.icon(
                       onPressed: () => _cancelBooking(item['id']),
@@ -266,79 +273,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       ),
                     ),
                   ),
-
-                if (!isUpcoming && status == 'completed')
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-                      ),
-                    ),
-                    child: TextButton.icon(
-                      onPressed: () => _showReviewDialog(context),
-                      icon: const Icon(Icons.star, color: AppColors.gold, size: 18),
-                      label: const Text(
-                        "AVALIAR EXPERIÊNCIA",
-                        style: TextStyle(color: AppColors.gold, fontSize: 12),
-                      ),
-                    ),
-                  ),
               ],
             ),
-          ).animate().fadeIn(delay: (100 * index).ms).slideY(begin: 0.1, end: 0);
+          ).animate().fadeIn(delay: (50 * index).ms).slideY(begin: 0.1, end: 0);
         },
-      ),
-    );
-  }
-
-  void _showReviewDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text("Avaliar Serviço", style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Como foi o teu atendimento?", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                5,
-                    (index) => const Icon(Icons.star, color: AppColors.gold, size: 30),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const TextField(
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: "Escreve um comentário...",
-                hintStyle: TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.black26,
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Obrigado pela avaliação! ⭐")),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-            child: const Text("ENVIAR", style: TextStyle(color: Colors.black)),
-          ),
-        ],
       ),
     );
   }

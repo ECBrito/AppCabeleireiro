@@ -16,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isOwner => userModel?.role == 'owner';
   bool get isClient => userModel?.role == 'client';
+  bool get isWorker => userModel?.role == 'worker'; // ADICIONA ISTO
 
   AuthProvider() {
     _init();

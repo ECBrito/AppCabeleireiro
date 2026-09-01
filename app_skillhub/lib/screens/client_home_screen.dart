@@ -157,6 +157,8 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final isStaff = auth.isOwner || auth.isWorker;
+
     final userPhoto = auth.userModel?.name.isNotEmpty == true
         ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(auth.userModel!.name)}&background=D4AF37&color=000'
         : 'https://randomuser.me/api/portraits/men/32.jpg';
@@ -181,6 +183,18 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
+          if (isStaff)
+            IconButton(
+              icon: const Icon(Icons.work, color: AppColors.gold),
+              tooltip: 'Painel Profissional',
+              onPressed: () {
+                if (auth.isOwner) {
+                  Navigator.pushNamed(context, '/admin_dashboard');
+                } else {
+                  Navigator.pushNamed(context, '/worker_dashboard');
+                }
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.white),
             tooltip: 'Favoritos',
