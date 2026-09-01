@@ -193,7 +193,7 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
                         shape: BoxShape.circle,
                         border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: Color(colorVal).withOpacity(0.6), blurRadius: 10)]
+                            ? [BoxShadow(color: Color(colorVal).withValues(alpha: 0.6), blurRadius: 10)]
                             : [],
                       ),
                       child: isSelected ? const Icon(Icons.check, color: Colors.black, size: 20) : null,

@@ -109,7 +109,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   color: AppColors.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: themeColor.withOpacity(0.3)),
+                    side: BorderSide(color: themeColor.withValues(alpha: 0.3)),
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(10),

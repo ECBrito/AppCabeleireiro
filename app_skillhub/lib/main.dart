@@ -16,6 +16,7 @@ import 'screens/booking_screen.dart';
 import 'screens/loyalty_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/appointments_screen.dart';
 import 'screens/profile_screen.dart';
 
 // Ecrãs de Gestão / Admin
@@ -88,6 +89,7 @@ class SkillHubApp extends StatelessWidget {
         '/favorites': (context) => const FavoritesScreen(),
         '/notifications': (context) => const NotificationsScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/appointments': (context) => const AppointmentsScreen(),
 
         // Administração e Gestão
         '/admin_dashboard': (context) => const AdminDashboard(),

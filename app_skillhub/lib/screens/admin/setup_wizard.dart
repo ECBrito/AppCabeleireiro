@@ -29,6 +29,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
     final isAvailable = await provider.checkCodeAvailability(_codeController.text);
 
     if (!isAvailable) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Este código já existe! Escolhe outro."), backgroundColor: Colors.red));
       return;

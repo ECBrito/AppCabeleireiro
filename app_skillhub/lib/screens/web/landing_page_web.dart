@@ -351,10 +351,10 @@ class _GlassNavBar extends StatelessWidget {
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
+        color: Colors.black.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20)],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -416,7 +416,7 @@ class _GlowButtonState extends State<_GlowButton> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: widget.isPrimary ? AppColors.gold : Colors.white24),
             boxShadow: _isHovered && widget.isPrimary
-                ? [BoxShadow(color: AppColors.gold.withOpacity(0.6), blurRadius: 20, spreadRadius: 2)]
+                ? [BoxShadow(color: AppColors.gold.withValues(alpha: 0.6), blurRadius: 20, spreadRadius: 2)]
                 : [],
           ),
           child: Text(
@@ -442,9 +442,9 @@ class _AnimatedBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.gold.withOpacity(0.1),
+        color: AppColors.gold.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.gold.withOpacity(0.3)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
       ),
       child: Text(text, style: const TextStyle(color: AppColors.gold, fontSize: 12, fontWeight: FontWeight.bold)),
     ).animate().shimmer(duration: 2.seconds, delay: 1.seconds);
@@ -465,16 +465,16 @@ class _FeatureCard extends StatelessWidget {
       width: width,
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.gold.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: AppColors.gold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: AppColors.gold, size: 28),
           ),
           const SizedBox(height: 20),
@@ -517,7 +517,7 @@ class _PricingCardState extends State<_PricingCard> {
           borderRadius: BorderRadius.circular(30),
           border: Border.all(color: _isHovered ? AppColors.gold : Colors.transparent, width: 2),
           boxShadow: _isHovered 
-              ? [BoxShadow(color: AppColors.gold.withOpacity(0.2), blurRadius: 30, spreadRadius: 5)] 
+              ? [BoxShadow(color: AppColors.gold.withValues(alpha: 0.2), blurRadius: 30, spreadRadius: 5)] 
               : [],
         ),
         child: Column(
@@ -592,7 +592,7 @@ class _ChameleonPhoneMockupState extends State<_ChameleonPhoneMockup> {
         color: const Color(0xFF121212),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: const Color(0xFF333333), width: 8),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 50, spreadRadius: 10)],
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 50, spreadRadius: 10)],
       ),
       child: Center(child: Icon(icon, size: 80, color: color)),
     );

@@ -45,7 +45,7 @@ class _MainShellState extends State<MainShell> {
 
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,

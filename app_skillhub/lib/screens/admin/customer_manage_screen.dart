@@ -214,7 +214,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                     return ListView.separated(
                       controller: scrollController,
                       itemCount: history.length,
-                      separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+                      separatorBuilder: (_, _) => const Divider(color: Colors.white10),
                       itemBuilder: (context, idx) {
                         final h = history[idx];
                         final status = (h['status'] ?? 'pending').toString().toUpperCase();
@@ -229,7 +229,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                           subtitle: Text("Profissional: ${h['worker_name'] ?? 'Barbeiro'} • ${h['booking_date'] ?? ''} às ${h['booking_time'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: statusColor.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
                             child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
                           ),
                         );
@@ -393,7 +393,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: isBlocked ? Colors.redAccent.withOpacity(0.5) : Colors.transparent,
+                            color: isBlocked ? Colors.redAccent.withValues(alpha: 0.5) : Colors.transparent,
                             width: 1,
                           ),
                         ),
@@ -401,7 +401,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: isBlocked ? Colors.redAccent.withOpacity(0.2) : themeColor.withOpacity(0.2),
+                              backgroundColor: isBlocked ? Colors.redAccent.withValues(alpha: 0.2) : themeColor.withValues(alpha: 0.2),
                               child: Icon(
                                 isBlocked ? Icons.block : Icons.person,
                                 color: isBlocked ? Colors.redAccent : themeColor,
@@ -422,7 +422,7 @@ class _CustomerManageScreenState extends State<CustomerManageScreen> {
                                 if (isBlocked)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                    decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
                                     child: const Text("BLOQUEADO", style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold)),
                                   ),
                               ],

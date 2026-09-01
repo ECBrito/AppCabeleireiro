@@ -130,7 +130,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: growth >= 0 ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                      color: growth >= 0 ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -182,12 +182,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           width: 20,
                           height: 120 * chartData[index], // Altura dinâmica
                           decoration: BoxDecoration(
-                            color: themeColor.withOpacity(0.8),
+                            color: themeColor.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(6),
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
-                              colors: [themeColor.withOpacity(0.4), themeColor],
+                              colors: [themeColor.withValues(alpha: 0.4), themeColor],
                             ),
                           ),
                         ),

@@ -186,7 +186,7 @@ class _PromotionManageScreenState extends State<PromotionManageScreen> {
                   margin: const EdgeInsets.only(bottom: 15),
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [color.withOpacity(0.8), color.withOpacity(0.4)]),
+                    gradient: LinearGradient(colors: [color.withValues(alpha: 0.8), color.withValues(alpha: 0.4)]),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(

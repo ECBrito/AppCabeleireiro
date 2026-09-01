@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../providers/auth_provider.dart';
 import '../config/theme.dart';
@@ -181,7 +180,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               border: Border(left: BorderSide(color: statusColor, width: 4)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -205,7 +204,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.15),
+                          color: statusColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -255,7 +254,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       border: Border(
-                        top: BorderSide(color: Colors.white.withOpacity(0.05)),
+                        top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                     ),
                     child: TextButton.icon(
@@ -273,7 +272,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       border: Border(
-                        top: BorderSide(color: Colors.white.withOpacity(0.05)),
+                        top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                     ),
                     child: TextButton.icon(

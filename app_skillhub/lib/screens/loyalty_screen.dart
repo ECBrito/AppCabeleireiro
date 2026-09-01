@@ -97,9 +97,9 @@ class _LoyaltyScreenState extends State<LoyaltyScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cardColor.withOpacity(0.4)),
+                    border: Border.all(color: cardColor.withValues(alpha: 0.4)),
                     boxShadow: [
-                      BoxShadow(color: cardColor.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5))
+                      BoxShadow(color: cardColor.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 5))
                     ],
                   ),
                   child: Column(
@@ -115,7 +115,7 @@ class _LoyaltyScreenState extends State<LoyaltyScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: cardColor.withOpacity(0.2),
+                              color: cardColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(

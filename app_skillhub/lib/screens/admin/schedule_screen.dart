@@ -138,7 +138,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   return SwitchListTile(
                     title: Text(day, style: const TextStyle(color: Colors.white)),
                     value: _openDays[day] ?? false,
-                    activeColor: themeColor,
+                    activeThumbColor: themeColor,
                     onChanged: (val) => setState(() => _openDays[day] = val),
                   );
                 }).toList(),

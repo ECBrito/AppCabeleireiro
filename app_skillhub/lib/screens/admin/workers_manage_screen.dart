@@ -191,14 +191,14 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: searchResults.length,
-                          separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                          separatorBuilder: (_, _) => const Divider(color: Colors.white10, height: 1),
                           itemBuilder: (context, index) {
                             final user = searchResults[index];
                             return ListTile(
                               dense: true,
                               leading: CircleAvatar(
                                 radius: 14,
-                                backgroundColor: themeColor.withOpacity(0.2),
+                                backgroundColor: themeColor.withValues(alpha: 0.2),
                                 child: Text(
                                   (user['name'] ?? 'U')[0].toUpperCase(),
                                   style: TextStyle(color: themeColor, fontSize: 12, fontWeight: FontWeight.bold),
@@ -230,9 +230,9 @@ class _WorkersManageScreenState extends State<WorkersManageScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.15),
+                          color: Colors.green.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.withOpacity(0.4)),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           children: [

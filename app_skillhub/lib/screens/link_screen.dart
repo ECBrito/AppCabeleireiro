@@ -54,10 +54,15 @@ class _LinkScreenState extends State<LinkScreen> {
                 hintText: "ex: barber",
                 filled: true, fillColor: const Color(0xFF1E1E1E),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.arrow_forward, color: Colors.white),
-                  onPressed: () => _entrar(_controller.text),
-                ),
+                suffixIcon: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                        onPressed: () => _entrar(_controller.text),
+                      ),
               ),
               onSubmitted: _entrar,
             ),

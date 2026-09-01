@@ -44,9 +44,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             margin: const EdgeInsets.all(20),
             padding: const EdgeInsets.all(25),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -69,7 +69,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   child: ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                       child: const Icon(Icons.receipt_long, color: Colors.red),
                     ),
                     title: Text(exp['title'], style: const TextStyle(color: Colors.white)),

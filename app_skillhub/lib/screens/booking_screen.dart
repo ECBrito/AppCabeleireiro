@@ -69,7 +69,10 @@ class _BookingScreenState extends State<BookingScreen> {
           ? authProvider.userModel!.name
           : (authProvider.currentUser?.email ?? "Cliente");
 
-      final formattedDate = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+      final clientPhone = authProvider.userModel?.phone ?? '';
+
+      final formattedDate =
+          "${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
 
       final response = await http.post(
         Uri.parse('$baseUrl/bookings'),
@@ -77,6 +80,7 @@ class _BookingScreenState extends State<BookingScreen> {
         body: jsonEncode({
           'client_id': authProvider.userModel?.id,
           'client_name': clientName,
+          'client_phone': clientPhone,
           'shop_id': shopId,
           'worker_id': _selectedWorker!['id'],
           'worker_name': _selectedWorker!['name'],
@@ -88,9 +92,10 @@ class _BookingScreenState extends State<BookingScreen> {
         }),
       );
 
+      final responseData = jsonDecode(response.body);
+
       if (response.statusCode != 201 && response.statusCode != 200) {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erro ao criar agendamento');
+        throw Exception(responseData['message'] ?? 'Erro ao criar agendamento');
       }
 
       if (!mounted) return;
@@ -103,7 +108,7 @@ class _BookingScreenState extends State<BookingScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
           content: Text(
-            "Agendado com ${_selectedWorker!['name']}!\nA tua vaga está reservada.",
+            "Agendado com ${_selectedWorker!['name']}!\nA tua vaga está reservada para as $_selectedTime.",
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
@@ -122,7 +127,7 @@ class _BookingScreenState extends State<BookingScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erro ao agendar: $e"),
+          content: Text("Erro ao agendar: ${e.toString().replaceAll('Exception: ', '')}"),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -201,7 +206,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                     width: 3,
                                   ),
                                   boxShadow: isSelected
-                                      ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 10)]
+                                      ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 10)]
                                       : [],
                                 ),
                                 child: CircleAvatar(
@@ -296,7 +301,7 @@ class _BookingScreenState extends State<BookingScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withOpacity(0.3)),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
               child: CalendarDatePicker(
                 initialDate: _selectedDate,
@@ -324,7 +329,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: isSelected ? color : Colors.grey.withOpacity(0.3)),
+                    side: BorderSide(color: isSelected ? color : Colors.grey.withValues(alpha: 0.3)),
                   ),
                   onSelected: (val) => setState(() => _selectedTime = time),
                 );
@@ -357,7 +362,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   elevation: 10,
-                  shadowColor: color.withOpacity(0.5),
+                  shadowColor: color.withValues(alpha: 0.5),
                 ),
                 child: _isSubmitting
                     ? const SizedBox(
@@ -365,7 +370,10 @@ class _BookingScreenState extends State<BookingScreen> {
                   width: 20,
                   child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
                 )
-                    : const Text("CONFIRMAR AGENDAMENTO", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : const Text(
+                  "CONFIRMAR AGENDAMENTO",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(height: 30),

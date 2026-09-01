@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../models/business_model.dart';
 import '../providers/app_provider.dart';
@@ -10,6 +12,8 @@ import '../services/shop_service.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
 import 'notifications_screen.dart';
+import 'loyalty_screen.dart';
+import 'appointments_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -19,40 +23,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = "";
-  int _selectedCategoryIndex = 0;
-
-  final List<Map<String, dynamic>> _visualCategories = [
-    {"name": "Todos", "icon": Icons.grid_view},
-    {"name": "Cabelo", "icon": Icons.content_cut},
-    {"name": "Barba", "icon": Icons.face},
-    {"name": "Spa", "icon": Icons.spa},
-    {"name": "Tattoo", "icon": Icons.brush},
-  ];
-
-  final List<Map<String, dynamic>> _topBarbers = [
-    {
-      'name': 'Carlos',
-      'rating': 5.0,
-      'image': 'https://randomuser.me/api/portraits/men/32.jpg',
-    },
-    {
-      'name': 'Sofia',
-      'rating': 4.9,
-      'image': 'https://randomuser.me/api/portraits/women/44.jpg',
-    },
-    {
-      'name': 'André',
-      'rating': 4.8,
-      'image': 'https://randomuser.me/api/portraits/men/85.jpg',
-    },
-    {
-      'name': 'Ana',
-      'rating': 4.9,
-      'image': 'https://randomuser.me/api/portraits/women/60.jpg',
-    },
-  ];
+  int _currentBottomIndex = 0;
 
   @override
   void initState() {
@@ -67,6 +38,117 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   @override
+  Widget build(BuildContext context) {
+    final List<Widget> screens = [
+      const _ClientHomeFeed(),
+      const AppointmentsScreen(),
+      const LoyaltyScreen(),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: IndexedStack(
+        index: _currentBottomIndex,
+        children: screens,
+      ),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          indicatorColor: AppColors.gold.withValues(alpha: 0.2),
+          labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
+                (states) => states.contains(WidgetState.selected)
+                ? const TextStyle(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 12)
+                : const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith<IconThemeData>(
+                (states) => states.contains(WidgetState.selected)
+                ? const IconThemeData(color: AppColors.gold)
+                : const IconThemeData(color: Colors.grey),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentBottomIndex,
+          onDestinationSelected: (idx) => setState(() => _currentBottomIndex = idx),
+          backgroundColor: const Color(0xFF1A1A1A),
+          elevation: 10,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: 'Descobrir',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month),
+              label: 'Marcações',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.card_giftcard_outlined),
+              selectedIcon: Icon(Icons.card_giftcard),
+              label: 'Fidelidade',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClientHomeFeed extends StatefulWidget {
+  const _ClientHomeFeed();
+
+  @override
+  State<_ClientHomeFeed> createState() => _ClientHomeFeedState();
+}
+
+class _ClientHomeFeedState extends State<_ClientHomeFeed> {
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+  int _selectedCategoryIndex = 0;
+
+  final List<Map<String, dynamic>> _visualCategories = [
+    {"name": "Todos", "icon": Icons.grid_view},
+    {"name": "Cabelo", "icon": Icons.content_cut},
+    {"name": "Barba", "icon": Icons.face},
+    {"name": "Estética", "icon": Icons.spa},
+  ];
+
+  late Future<List<dynamic>> _promosFuture;
+  late Future<List<dynamic>> _topWorkersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDynamicData();
+  }
+
+  void _loadDynamicData() {
+    _promosFuture = _fetchActivePromotions();
+    _topWorkersFuture = _fetchTopWorkers();
+  }
+
+  Future<List<dynamic>> _fetchActivePromotions() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/promotions/active'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<List<dynamic>> _fetchTopWorkers() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/workers/top'));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -74,6 +156,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final userPhoto = auth.userModel?.name.isNotEmpty == true
+        ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(auth.userModel!.name)}&background=D4AF37&color=000'
+        : 'https://randomuser.me/api/portraits/men/32.jpg';
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
@@ -100,42 +187,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const FavoritesScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const FavoritesScreen()),
               );
             },
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  color: Colors.white,
-                ),
-                tooltip: 'Notificações',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const NotificationsScreen(),
-                    ),
-                  );
-                },
-              ),
-              Positioned(
-                right: 12,
-                top: 12,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+            tooltip: 'Notificações',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0, left: 8.0),
@@ -143,382 +207,366 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: AppColors.gold,
-                  shape: BoxShape.circle,
-                ),
-                child: const CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage(
-                    'https://randomuser.me/api/portraits/men/32.jpg',
-                  ),
-                  backgroundColor: Color(0xFF1E1E1E),
-                ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundImage: NetworkImage(userPhoto),
+                backgroundColor: const Color(0xFF1E1E1E),
               ),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // BARRA DE PESQUISA
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: "Procurar barbearia, spa...",
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  fillColor: const Color(0xFF1E1E1E),
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+      body: RefreshIndicator(
+        color: AppColors.gold,
+        onRefresh: () async {
+          setState(() {
+            _loadDynamicData();
+          });
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // BARRA DE PESQUISA
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: "Procurar barbearia, localização...",
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    fillColor: const Color(0xFF1E1E1E),
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = "");
+                      },
+                    )
+                        : null,
                   ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.grey),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = "");
-                    },
-                  )
-                      : null,
                 ),
               ),
-            ),
 
-            // CATEGORIAS VISUAIS
-            SizedBox(
-              height: 90,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _visualCategories.length,
-                itemBuilder: (context, index) {
-                  final cat = _visualCategories[index];
-                  final isSelected = _selectedCategoryIndex == index;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategoryIndex = index),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 20),
-                      child: Column(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.all(15),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.gold
-                                  : const Color(0xFF1E1E1E),
-                              shape: BoxShape.circle,
-                              border: isSelected
-                                  ? null
-                                  : Border.all(color: Colors.white10),
-                              boxShadow: isSelected
-                                  ? [
-                                BoxShadow(
-                                  color: AppColors.gold.withOpacity(0.4),
-                                  blurRadius: 10,
-                                ),
-                              ]
-                                  : [],
-                            ),
-                            child: Icon(
-                              cat['icon'] as IconData,
-                              color: isSelected ? Colors.black : Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            cat['name'] as String,
-                            style: TextStyle(
-                              color: isSelected ? AppColors.gold : Colors.grey,
-                              fontSize: 12,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // BANNER PROMOÇÃO
-            SizedBox(
-              height: 150,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  _buildPromoCard(
-                    const Color(0xFF9C27B0),
-                    "Semana do Estudante",
-                    "20% OFF",
-                  ),
-                  _buildPromoCard(
-                    const Color(0xFF2196F3),
-                    "Indique um Amigo",
-                    "Ganhe 50 pts",
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // TOP PROFISSIONAIS
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Top Profissionais",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                  ),
-                  const Text(
-                    "Ver todos",
-                    style: TextStyle(
-                      color: AppColors.gold,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 15),
-            SizedBox(
-              height: 110,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _topBarbers.length,
-                itemBuilder: (context, index) {
-                  final barber = _topBarbers[index];
-                  return Container(
-                    margin: const EdgeInsets.only(right: 20),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.gold, width: 2),
-                          ),
-                          child: CircleAvatar(
-                            radius: 30,
-                            backgroundImage: NetworkImage(barber['image']),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          barber['name'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Row(
+              // CATEGORIAS VISUAIS
+              SizedBox(
+                height: 90,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _visualCategories.length,
+                  itemBuilder: (context, index) {
+                    final cat = _visualCategories[index];
+                    final isSelected = _selectedCategoryIndex == index;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedCategoryIndex = index),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 20),
+                        child: Column(
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 10,
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.gold : const Color(0xFF1E1E1E),
+                                shape: BoxShape.circle,
+                                border: isSelected ? null : Border.all(color: Colors.white10),
+                                boxShadow: isSelected
+                                    ? [
+                                  BoxShadow(
+                                    color: AppColors.gold.withValues(alpha: 0.4),
+                                    blurRadius: 10,
+                                  ),
+                                ]
+                                    : [],
+                              ),
+                              child: Icon(
+                                cat['icon'] as IconData,
+                                color: isSelected ? Colors.black : Colors.white,
+                                size: 24,
+                              ),
                             ),
+                            const SizedBox(height: 5),
                             Text(
-                              " ${barber['rating']}",
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 10,
+                              cat['name'] as String,
+                              style: TextStyle(
+                                color: isSelected ? AppColors.gold : Colors.grey,
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ).animate().scale(delay: (50 * index).ms);
-                },
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 15),
 
-            // LISTA DE LOJAS DO POSTGRESQL
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: ShopService.getShops(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: AppColors.gold),
-                    ),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Text(
-                        "Erro ao carregar lojas:\n${snapshot.error}",
-                        style: const TextStyle(color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
+              // 1. CAMPANHAS / PROMOÇÕES REAIS (PostgreSQL)
+              FutureBuilder<List<dynamic>>(
+                future: _promosFuture,
+                builder: (context, snapshot) {
+                  final promos = snapshot.data ?? [];
+                  if (promos.isEmpty) return const SizedBox.shrink();
 
-                final List<Map<String, dynamic>> shopsData =
-                    snapshot.data ?? [];
-
-                final shops = shopsData
-                    .map((data) {
-                  final colorHex = int.tryParse(data['color_hex']?.toString() ?? '') ?? 0xFFFFD700;
-                  return Business(
-                    id: data['id'].toString(),
-                    name: data['name'] ?? 'Barbearia',
-                    type: BusinessType.values.first,
-                    code: data['code'] ?? 'SKILL',
-                    colorHex: colorHex,
-                    address: data['address'] ?? 'Beja',
-                    rating:
-                    double.tryParse(
-                      data['rating']?.toString() ?? '5.0',
-                    ) ??
-                        5.0,
-                    coverImage:
-                    data['cover_image'] ??
-                        'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-                  );
-                })
-                    .where((shop) {
-                  return shop.name.toLowerCase().contains(
-                    _searchQuery.toLowerCase(),
-                  );
-                })
-                    .toList();
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Recomendados",
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(color: Colors.white),
-                          ),
-                          Text(
-                            "${shops.length} locais",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    shops.isEmpty
-                        ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(40),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Text(
-                          "Sem barbearias registadas.",
-                          style: TextStyle(color: Colors.grey),
+                          "Campanhas Ativas",
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    )
-                        : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: shops.length,
-                      itemBuilder: (context, index) {
-                        return _buildShopCard(context, shops[index]);
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: promos.length,
+                          itemBuilder: (context, index) {
+                            final p = promos[index];
+                            final colorHex = int.tryParse(p['color_hex']?.toString() ?? '') ?? 0xFF9C27B0;
+                            final color = Color(colorHex);
 
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPromoCard(Color color, String title, String subtitle) {
-    return Container(
-      width: 260,
-      margin: const EdgeInsets.only(right: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.8), color.withOpacity(0.4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              "PROMO",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+                            return Container(
+                              width: 250,
+                              margin: const EdgeInsets.only(right: 15),
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [color.withValues(alpha: 0.85), color.withValues(alpha: 0.4)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black38,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      p['shop_name'] ?? "DESTAQUE",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    p['title'] ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    p['subtitle'] ?? '',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                    ],
+                  );
+                },
               ),
-            ),
+
+              // 2. PROFISSIONAIS REAIS DA EQUIPA (PostgreSQL)
+              FutureBuilder<List<dynamic>>(
+                future: _topWorkersFuture,
+                builder: (context, snapshot) {
+                  final workers = snapshot.data ?? [];
+                  if (workers.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          "Profissionais em Destaque",
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 110,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: workers.length,
+                          itemBuilder: (context, index) {
+                            final worker = workers[index];
+                            final name = worker['name'] ?? 'Barbeiro';
+                            final photoUrl = worker['photo_url'] ??
+                                'https://randomuser.me/api/portraits/men/32.jpg';
+                            final rating = double.tryParse(worker['rating']?.toString() ?? '5.0') ?? 5.0;
+
+                            return Container(
+                              margin: const EdgeInsets.only(right: 18),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.gold, width: 2),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 28,
+                                      backgroundImage: NetworkImage(photoUrl),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    name.toString().split(' ')[0],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.star, color: Colors.amber, size: 10),
+                                      Text(
+                                        " $rating",
+                                        style: const TextStyle(color: Colors.grey, fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ).animate().scale(delay: (40 * index).ms);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                    ],
+                  );
+                },
+              ),
+
+              // 3. LISTA DE LOJAS DO POSTGRESQL
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: ShopService.getShops(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(30),
+                        child: CircularProgressIndicator(color: AppColors.gold),
+                      ),
+                    );
+                  }
+
+                  final List<Map<String, dynamic>> shopsData = snapshot.data ?? [];
+
+                  final shops = shopsData
+                      .map((data) {
+                    final colorHex = int.tryParse(data['color_hex']?.toString() ?? '') ?? 0xFFFFD700;
+                    return Business(
+                      id: data['id'].toString(),
+                      name: data['name'] ?? 'Barbearia',
+                      type: BusinessType.values.first,
+                      code: data['code'] ?? 'SKILL',
+                      colorHex: colorHex,
+                      address: data['address'] ?? 'Beja',
+                      rating: double.tryParse(data['rating']?.toString() ?? '5.0') ?? 5.0,
+                      coverImage: data['cover_image'] ??
+                          'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+                    );
+                  })
+                      .where((shop) => shop.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+                      .toList();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Espaços Recomendados",
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+                            ),
+                            Text("${shops.length} locais", style: const TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      shops.isEmpty
+                          ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40),
+                          child: Text(
+                            "Sem barbearias registadas.",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      )
+                          : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: shops.length,
+                        itemBuilder: (context, index) {
+                          return _buildShopCard(context, shops[index]);
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 40),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            subtitle,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -535,7 +583,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
-              color: Color(shop.colorHex).withOpacity(0.3),
+              color: Color(shop.colorHex).withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -551,16 +599,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                       child: Image.network(
                         shop.coverImage,
                         height: 150,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) =>
-                            Container(height: 150, color: Colors.grey[900]),
+                        errorBuilder: (c, e, s) => Container(height: 150, color: Colors.grey[900]),
                       ),
                     ),
                     Positioned(
@@ -605,8 +650,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         children: [
                           Text(
                             shop.name,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: Color(shop.colorHex),
                               fontSize: 18,
                             ),
@@ -623,11 +667,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       ),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.star,
-                            color: AppColors.gold,
-                            size: 16,
-                          ),
+                          const Icon(Icons.star, color: AppColors.gold, size: 16),
                           const SizedBox(width: 4),
                           Text(
                             shop.rating.toString(),

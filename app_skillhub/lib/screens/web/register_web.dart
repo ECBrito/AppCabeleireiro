@@ -50,7 +50,7 @@ class _RegisterWebState extends State<RegisterWeb> {
                   // Testemunho
                   Container(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(20)),
                     child: const Row(
                       children: [
                         CircleAvatar(backgroundColor: Colors.grey, child: Icon(Icons.person, color: Colors.white)),

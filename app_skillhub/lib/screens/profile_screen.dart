@@ -170,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: themeColor.withOpacity(0.3)),
+                  border: Border.all(color: themeColor.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
@@ -193,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: () => appProvider.unlinkBusiness(),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
-                          side: BorderSide(color: Colors.red.withOpacity(0.5)),
+                          side: BorderSide(color: Colors.red.withValues(alpha: 0.5)),
                         ),
                         icon: const Icon(Icons.link_off),
                         label: const Text("DESVINCULAR DESTA LOJA"),

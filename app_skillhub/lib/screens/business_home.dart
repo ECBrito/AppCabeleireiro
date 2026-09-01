@@ -45,7 +45,7 @@ class BusinessHome extends StatelessWidget {
                 height: 350, 
                 width: double.infinity, 
                 fit: BoxFit.cover,
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 colorBlendMode: BlendMode.darken,
                 errorBuilder: (c, e, s) => Container(height: 350, color: Colors.grey[900]),
               ),
@@ -55,7 +55,7 @@ class BusinessHome extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.9)],
                   ),
                 ),
               ),
@@ -152,7 +152,7 @@ class BusinessHome extends StatelessWidget {
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 10,
-                        shadowColor: color.withOpacity(0.4),
+                        shadowColor: color.withValues(alpha: 0.4),
                       ),
                       icon: Icon(auth.isLoggedIn && auth.isOwner ? Icons.dashboard : Icons.calendar_month),
                       

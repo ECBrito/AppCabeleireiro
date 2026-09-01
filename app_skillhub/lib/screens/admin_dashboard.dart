@@ -179,7 +179,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _isShopOpen ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5),
+          color: _isShopOpen ? Colors.green.withValues(alpha: 0.5) : Colors.red.withValues(alpha: 0.5),
         ),
       ),
       child: Row(
@@ -195,7 +195,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: (_isShopOpen ? Colors.green : Colors.red).withOpacity(0.6),
+                      color: (_isShopOpen ? Colors.green : Colors.red).withValues(alpha: 0.6),
                       blurRadius: 8,
                     )
                   ],
@@ -213,7 +213,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           Switch(
             value: _isShopOpen,
-            activeColor: Colors.green,
+            activeThumbColor: Colors.green,
             onChanged: (val) => setState(() => _isShopOpen = val),
           ),
         ],
@@ -227,14 +227,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [themeColor.withOpacity(0.9), themeColor.withOpacity(0.6)],
+          colors: [themeColor.withValues(alpha: 0.9), themeColor.withValues(alpha: 0.6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: themeColor.withOpacity(0.3),
+            color: themeColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           )
@@ -304,7 +304,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.2)),
+              border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -426,7 +426,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

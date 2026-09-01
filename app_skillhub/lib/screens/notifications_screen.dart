@@ -103,7 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.all(20),
               itemCount: notifications.length,
-              separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+              separatorBuilder: (_, _) => const Divider(color: Colors.white10),
               itemBuilder: (context, index) {
                 final notif = notifications[index];
                 final isRead = notif['is_read'] == true;
@@ -111,7 +111,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: isRead ? Colors.white10 : AppColors.gold.withOpacity(0.2),
+                    backgroundColor: isRead ? Colors.white10 : AppColors.gold.withValues(alpha: 0.2),
                     child: Icon(
                       isRead ? Icons.notifications_none : Icons.notifications_active,
                       color: isRead ? Colors.grey : AppColors.gold,
@@ -132,7 +132,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       const SizedBox(height: 5),
                       Text(
                         _formatTime(notif['created_at']),
-                        style: TextStyle(color: AppColors.gold.withOpacity(0.7), fontSize: 10),
+                        style: TextStyle(color: AppColors.gold.withValues(alpha: 0.7), fontSize: 10),
                       ),
                     ],
                   ),

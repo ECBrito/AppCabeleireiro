@@ -270,7 +270,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.gold.withOpacity(0.15) : AppColors.surface,
+          color: isSelected ? AppColors.gold.withValues(alpha: 0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.gold : Colors.white10,
