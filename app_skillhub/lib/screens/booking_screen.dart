@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
@@ -18,380 +19,413 @@ class _BookingScreenState extends State<BookingScreen> {
 
   DateTime _selectedDate = DateTime.now();
   String? _selectedTime;
-  String? _selectedServiceName;
-  double _selectedServicePrice = 0.0;
   Map<String, dynamic>? _selectedWorker;
-  bool _isSubmitting = false;
+  Map<String, dynamic>? _selectedService;
 
-  final List<String> _timeSlots = [
-    "09:00", "09:30", "10:00", "10:30", "11:00",
-    "14:00", "14:30", "15:00", "15:30", "16:00", "17:00", "17:30", "18:00"
+  List<dynamic> _workers = [];
+  List<dynamic> _services = [];
+  List<String> _occupiedSlots = [];
+  bool _isLoadingSlots = false;
+
+  final List<String> _allTimeSlots = [
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00', '18:30', '19:00'
   ];
 
-  Future<List<dynamic>> _fetchWorkers(int shopId) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/workers?shopId=$shopId'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-    } catch (_) {}
-    return [];
+  String get _formattedDate =>
+      "${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
   }
 
-  Future<List<dynamic>> _fetchServices(int shopId) async {
+  Future<void> _loadInitialData() async {
+    final app = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(app.activeBusiness?.id ?? '1') ?? 1;
+
     try {
-      final response = await http.get(Uri.parse('$baseUrl/services?shopId=$shopId'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      final workersRes = await http.get(Uri.parse('$baseUrl/workers?shopId=$shopId'));
+      final servicesRes = await http.get(Uri.parse('$baseUrl/services?shopId=$shopId'));
+
+      if (workersRes.statusCode == 200 && servicesRes.statusCode == 200) {
+        setState(() {
+          _workers = jsonDecode(workersRes.body);
+          _services = jsonDecode(servicesRes.body);
+          if (_workers.isNotEmpty) {
+            _selectedWorker = _workers.first;
+          }
+          if (_services.isNotEmpty) {
+            _selectedService = _services.first;
+          }
+        });
+        _fetchOccupiedSlots();
       }
     } catch (_) {}
-    return [];
   }
 
-  Future<void> _confirmBooking(int shopId) async {
-    if (_selectedTime == null || _selectedServiceName == null || _selectedWorker == null) {
+  Future<void> _fetchOccupiedSlots() async {
+    final app = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(app.activeBusiness?.id ?? '1') ?? 1;
+    final workerId = _selectedWorker?['id'];
+
+    setState(() => _isLoadingSlots = true);
+
+    try {
+      String url = '$baseUrl/bookings/occupied-slots?shopId=$shopId&date=$_formattedDate';
+      if (workerId != null) {
+        url += '&workerId=$workerId';
+      }
+
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(res.body);
+        setState(() {
+          _occupiedSlots = data.map((e) => e.toString()).toList();
+          // Se a hora que o cliente tinha selecionada já estiver ocupada, desseleciona-a
+          if (_selectedTime != null && _occupiedSlots.contains(_selectedTime)) {
+            _selectedTime = null;
+          }
+        });
+      }
+    } catch (_) {
+    } finally {
+      setState(() => _isLoadingSlots = false);
+    }
+  }
+
+  Future<void> _confirmBooking() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final app = Provider.of<AppProvider>(context, listen: false);
+
+    if (_selectedWorker == null || _selectedService == null || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor escolhe um Profissional, Serviço e Horário.'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
+          content: Text("Seleciona o profissional, o serviço e um horário disponível."),
+          backgroundColor: Colors.orangeAccent,
         ),
       );
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    final body = {
+      'client_id': auth.userModel?.id,
+      'client_name': auth.userModel?.name ?? 'Cliente',
+      'client_phone': auth.userModel?.phone ?? '',
+      'shop_id': int.tryParse(app.activeBusiness?.id ?? '1') ?? 1,
+      'worker_id': _selectedWorker!['id'],
+      'worker_name': _selectedWorker!['name'],
+      'service_name': _selectedService!['name'],
+      'price': double.tryParse(_selectedService!['price'].toString()) ?? 0.0,
+      'booking_date': _formattedDate,
+      'booking_time': _selectedTime,
+      'status': 'pending',
+    };
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-      final clientName = authProvider.userModel?.name.isNotEmpty == true
-          ? authProvider.userModel!.name
-          : (authProvider.currentUser?.email ?? "Cliente");
-
-      final clientPhone = authProvider.userModel?.phone ?? '';
-
-      final formattedDate =
-          "${_selectedDate.year.toString().padLeft(4, '0')}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
-
-      final response = await http.post(
+      final res = await http.post(
         Uri.parse('$baseUrl/bookings'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'client_id': authProvider.userModel?.id,
-          'client_name': clientName,
-          'client_phone': clientPhone,
-          'shop_id': shopId,
-          'worker_id': _selectedWorker!['id'],
-          'worker_name': _selectedWorker!['name'],
-          'service_name': _selectedServiceName,
-          'price': _selectedServicePrice,
-          'booking_date': formattedDate,
-          'booking_time': _selectedTime,
-          'status': 'pending',
-        }),
+        body: jsonEncode(body),
       );
 
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode != 201 && response.statusCode != 200) {
-        throw Exception(responseData['message'] ?? 'Erro ao criar agendamento');
-      }
-
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-          content: Text(
-            "Agendado com ${_selectedWorker!['name']}!\nA tua vaga está reservada para as $_selectedTime.",
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
+      if (res.statusCode == 201) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Marcação realizada com sucesso!"),
+            backgroundColor: Colors.green,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context);
-              },
-              child: const Text("OK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
+        );
+        Navigator.pop(context);
+      } else if (res.statusCode == 409) {
+        final err = jsonDecode(res.body);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err['message'] ?? "Horário indisponível."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        _fetchOccupiedSlots();
+      } else {
+        throw Exception();
+      }
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Erro ao agendar: ${e.toString().replaceAll('Exception: ', '')}"),
+        const SnackBar(
+          content: Text("Erro ao concluir marcação."),
           backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
         ),
       );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<AppProvider>(context);
-    final biz = provider.activeBusiness;
-    final color = provider.getThemeColor();
-
-    if (biz == null) return const SizedBox();
-    final shopId = int.tryParse(biz.id) ?? 1;
+    final app = Provider.of<AppProvider>(context);
+    final themeColor = app.getThemeColor();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: Text('Agendar ${biz.name}'),
-        backgroundColor: AppColors.background,
-        iconTheme: IconThemeData(color: color),
-        elevation: 0,
+        title: const Text("Marcar Atendimento"),
+        backgroundColor: const Color(0xFF121212),
+        iconTheme: IconThemeData(color: themeColor),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle("Com quem queres marcar?", color),
-            const SizedBox(height: 15),
-
-            FutureBuilder<List<dynamic>>(
-              future: _fetchWorkers(shopId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: color));
-                }
-
-                final workers = snapshot.data ?? [];
-
-                if (workers.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      "Nenhum profissional disponível de momento.",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  );
-                }
-
-                return SizedBox(
-                  height: 140,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: workers.length,
-                    itemBuilder: (context, index) {
-                      final worker = workers[index];
-                      final isSelected = _selectedWorker?['id'] == worker['id'];
-                      final rating = double.tryParse(worker['rating']?.toString() ?? '5.0') ?? 5.0;
-
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedWorker = worker),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 20),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? color : Colors.transparent,
-                                    width: 3,
-                                  ),
-                                  boxShadow: isSelected
-                                      ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 10)]
-                                      : [],
-                                ),
-                                child: CircleAvatar(
-                                  radius: 35,
-                                  backgroundColor: AppColors.surface,
-                                  backgroundImage: NetworkImage(
-                                    worker['photo_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                (worker['name'] ?? 'Profissional').toString().split(' ')[0],
-                                style: TextStyle(
-                                  color: isSelected ? color : Colors.white,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(Icons.star, size: 12, color: Colors.amber),
-                                  Text(" $rating", style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+            // 1. ESCOLHER DATA
+            const Text(
+              "1. Seleciona o Dia",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 70,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: 14,
+                itemBuilder: (context, idx) {
+                  final date = DateTime.now().add(Duration(days: idx));
+                  final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month;
 
-            const Divider(color: Colors.white10, height: 40),
-
-            _buildSectionTitle("Qual o serviço?", color),
-            const SizedBox(height: 10),
-
-            FutureBuilder<List<dynamic>>(
-              future: _fetchServices(shopId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: color));
-                }
-
-                final services = snapshot.data ?? [];
-
-                if (services.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Text("Sem serviços disponíveis de momento.", style: TextStyle(color: Colors.grey)),
-                  );
-                }
-
-                return Column(
-                  children: services.map((service) {
-                    final name = service['name'] ?? '';
-                    final price = double.tryParse(service['price']?.toString() ?? '0.0') ?? 0.0;
-                    final duration = service['duration_minutes'] ?? 30;
-                    final description = service['description'] ?? '';
-
-                    return RadioListTile<String>(
-                      activeColor: color,
-                      contentPadding: EdgeInsets.zero,
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedDate = date);
+                      _fetchOccupiedSlots();
+                    },
+                    child: Container(
+                      width: 55,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? themeColor : const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? Colors.transparent : Colors.white12),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(name, style: const TextStyle(color: Colors.white)),
-                          Text("${price.toStringAsFixed(2)}€", style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+                          Text(
+                            DateFormat('E', 'pt_PT').format(date).toUpperCase(),
+                            style: TextStyle(
+                              color: isSelected ? Colors.black : Colors.grey,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            date.day.toString(),
+                            style: TextStyle(
+                              color: isSelected ? Colors.black : Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
-                      subtitle: Text("$duration min • $description", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                      value: name,
-                      groupValue: _selectedServiceName,
-                      onChanged: (value) => setState(() {
-                        _selectedServiceName = value;
-                        _selectedServicePrice = price;
-                      }),
-                    );
-                  }).toList(),
-                );
-              },
+                    ),
+                  );
+                },
+              ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
 
-            _buildSectionTitle("Quando?", color),
-            const SizedBox(height: 15),
+            // 2. ESCOLHER PROFISSIONAL
+            const Text(
+              "2. Profissional",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 90,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _workers.length,
+                itemBuilder: (context, idx) {
+                  final worker = _workers[idx];
+                  final isSelected = _selectedWorker?['id'] == worker['id'];
 
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: 0.3)),
-              ),
-              child: CalendarDatePicker(
-                initialDate: _selectedDate,
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 60)),
-                onDateChanged: (date) => setState(() => _selectedDate = date),
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedWorker = worker);
+                      _fetchOccupiedSlots();
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 16),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? themeColor : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 26,
+                              backgroundImage: NetworkImage(
+                                worker['photo_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            (worker['name'] ?? '').toString().split(' ').first,
+                            style: TextStyle(
+                              color: isSelected ? themeColor : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
 
             const SizedBox(height: 20),
 
+            // 3. ESCOLHER SERVIÇO
+            const Text(
+              "3. Serviço",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            ..._services.map((svc) {
+              final isSelected = _selectedService?['id'] == svc['id'];
+              final price = double.tryParse(svc['price'].toString()) ?? 0.0;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isSelected ? themeColor : Colors.white12),
+                ),
+                child: ListTile(
+                  dense: true,
+                  onTap: () => setState(() => _selectedService = svc),
+                  leading: Icon(
+                    isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                    color: isSelected ? themeColor : Colors.grey,
+                  ),
+                  title: Text(svc['name'] ?? '', style: const TextStyle(color: Colors.white)),
+                  trailing: Text(
+                    "${price.toStringAsFixed(2)}€",
+                    style: TextStyle(color: themeColor, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 25),
+
+            // 4. HORÁRIOS (COM ESTILO DESATIVADO / DISABLED)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "4. Horário",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                if (_isLoadingSlots)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: _timeSlots.map((time) {
+              children: _allTimeSlots.map((time) {
+                final isOccupied = _occupiedSlots.contains(time);
                 final isSelected = _selectedTime == time;
-                return ChoiceChip(
-                  label: Text(time),
-                  selected: isSelected,
-                  selectedColor: color,
-                  backgroundColor: AppColors.surface,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : Colors.white,
-                    fontWeight: FontWeight.bold,
+
+                return InkWell(
+                  onTap: isOccupied
+                      ? null // Totalmente desativado ao toque
+                      : () {
+                    setState(() {
+                      _selectedTime = isSelected ? null : time;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isOccupied
+                          ? Colors.white.withValues(alpha: 0.04) // Fundo opaco / desativado
+                          : (isSelected ? themeColor : const Color(0xFF1E1E1E)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isOccupied
+                            ? Colors.transparent
+                            : (isSelected ? themeColor : Colors.white12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isOccupied) ...[
+                          Icon(Icons.lock_outline, size: 12, color: Colors.grey[700]),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          time,
+                          style: TextStyle(
+                            color: isOccupied
+                                ? Colors.grey[700] // Texto escurecido
+                                : (isSelected ? Colors.black : Colors.white),
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            decoration: isOccupied ? TextDecoration.lineThrough : null, // Efeito riscado
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: isSelected ? color : Colors.grey.withValues(alpha: 0.3)),
-                  ),
-                  onSelected: (val) => setState(() => _selectedTime = time),
                 );
               }).toList(),
             ),
 
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
 
-            if (_selectedServicePrice > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text("Total Estimado", style: TextStyle(color: Colors.white, fontSize: 18)),
-                    Text(
-                      "${_selectedServicePrice.toStringAsFixed(2)}€",
-                      style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-
+            // BOTÃO CONFIRMAR
             SizedBox(
               width: double.infinity,
+              height: 50,
               child: ElevatedButton(
-                onPressed: _isSubmitting ? null : () => _confirmBooking(shopId),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  elevation: 10,
-                  shadowColor: color.withValues(alpha: 0.5),
+                  backgroundColor: themeColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
-                )
-                    : const Text(
-                  "CONFIRMAR AGENDAMENTO",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                onPressed: _selectedTime == null ? null : _confirmBooking,
+                child: const Text(
+                  "CONFIRMAR MARCAÇÃO",
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
-            const SizedBox(height: 30),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, Color color) {
-    return Row(
-      children: [
-        Container(width: 4, height: 18, color: color, margin: const EdgeInsets.only(right: 10)),
-        Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ],
     );
   }
 }

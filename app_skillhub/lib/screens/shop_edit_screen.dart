@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/theme.dart';
 import '../providers/app_provider.dart';
 import '../models/business_model.dart';
+import 'shop_portfolio_screen.dart';
 
 class ShopEditScreen extends StatefulWidget {
   const ShopEditScreen({super.key});
@@ -19,10 +20,16 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _addressController;
+  late TextEditingController _phoneController;
+  late TextEditingController _latController;
+  late TextEditingController _lngController;
   late TextEditingController _coverImageController;
+  late TextEditingController _openTimeController;
+  late TextEditingController _closeTimeController;
 
   int _selectedColorHex = 0xFFFFD700;
   bool _isLoading = false;
+  bool _isFetchingInitial = true;
 
   final List<int> _availableColors = [
     0xFFFFD700, // Gold
@@ -41,15 +48,56 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
 
     _nameController = TextEditingController(text: currentShop?.name ?? '');
     _addressController = TextEditingController(text: currentShop?.address ?? '');
+    _phoneController = TextEditingController();
+    _latController = TextEditingController();
+    _lngController = TextEditingController();
     _coverImageController = TextEditingController(text: currentShop?.coverImage ?? '');
+    _openTimeController = TextEditingController(text: '09:00');
+    _closeTimeController = TextEditingController(text: '19:00');
     _selectedColorHex = currentShop?.colorHex ?? 0xFFFFD700;
+
+    _loadFullShopDetails();
+  }
+
+  Future<void> _loadFullShopDetails() async {
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    final shopId = int.tryParse(provider.activeBusiness?.id ?? '1') ?? 1;
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/shops/$shopId'));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          _phoneController.text = data['phone'] ?? '';
+          _latController.text = data['latitude']?.toString() ?? '';
+          _lngController.text = data['longitude']?.toString() ?? '';
+        });
+      }
+
+      final schedRes = await http.get(Uri.parse('$baseUrl/shops/$shopId/schedule'));
+      if (schedRes.statusCode == 200) {
+        final schedData = jsonDecode(schedRes.body);
+        setState(() {
+          _openTimeController.text = schedData['open_time'] ?? '09:00';
+          _closeTimeController.text = schedData['close_time'] ?? '19:00';
+        });
+      }
+    } catch (_) {
+    } finally {
+      setState(() => _isFetchingInitial = false);
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
+    _latController.dispose();
+    _lngController.dispose();
     _coverImageController.dispose();
+    _openTimeController.dispose();
+    _closeTimeController.dispose();
     super.dispose();
   }
 
@@ -67,15 +115,27 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
         body: jsonEncode({
           'name': _nameController.text.trim(),
           'address': _addressController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'latitude': double.tryParse(_latController.text.trim()),
+          'longitude': double.tryParse(_lngController.text.trim()),
           'cover_image': _coverImageController.text.trim(),
           'color_hex': _selectedColorHex,
+        }),
+      );
+
+      await http.put(
+        Uri.parse('$baseUrl/shops/$shopId/schedule'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'open_days': ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+          'open_time': _openTimeController.text.trim(),
+          'close_time': _closeTimeController.text.trim(),
         }),
       );
 
       if (response.statusCode == 200) {
         final updatedData = jsonDecode(response.body);
 
-        // Atualiza o estado global no AppProvider
         final updatedShop = Business(
           id: updatedData['id'].toString(),
           name: updatedData['name'] ?? '',
@@ -92,12 +152,12 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Loja atualizada com sucesso!"),
+            content: Text("Loja e horários atualizados com sucesso!"),
             backgroundColor: Colors.green,
           ),
         );
       } else {
-        throw Exception('Erro ao atualizar os dados no servidor');
+        throw Exception('Erro ao atualizar os dados');
       }
     } catch (e) {
       if (mounted) {
@@ -120,14 +180,74 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
         title: const Text("Configurar Espaço"),
         backgroundColor: AppColors.background,
         iconTheme: IconThemeData(color: themeColor),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.photo_library_outlined),
+            tooltip: "Gerir Portfólio",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ShopPortfolioScreen()),
+              );
+            },
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+      body: _isFetchingInitial
+          ? Center(child: CircularProgressIndicator(color: themeColor))
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ACESSO RÁPIDO AO PORTFÓLIO
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: themeColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.collections, color: themeColor),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Galeria e Portfólio",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            "Adiciona ou remove fotos de trabalhos realizados",
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: themeColor,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ShopPortfolioScreen()),
+                        );
+                      },
+                      child: const Text("GERIR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 25),
+
               _buildSectionTitle("Informações Gerais"),
               const SizedBox(height: 15),
 
@@ -136,13 +256,7 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),
                 validator: (val) => val == null || val.trim().isEmpty ? 'Insere o nome da loja' : null,
-                decoration: InputDecoration(
-                  labelText: "Nome da Barbearia / Salão",
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
+                decoration: _buildInputDecoration("Nome da Barbearia / Salão", Icons.store),
               ),
               const SizedBox(height: 15),
 
@@ -151,13 +265,40 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
                 controller: _addressController,
                 style: const TextStyle(color: Colors.white),
                 validator: (val) => val == null || val.trim().isEmpty ? 'Insere a morada' : null,
-                decoration: InputDecoration(
-                  labelText: "Morada / Localização",
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
+                decoration: _buildInputDecoration("Morada Completa", Icons.location_on),
+              ),
+              const SizedBox(height: 15),
+
+              // TELEFONE
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: Colors.white),
+                decoration: _buildInputDecoration("Telefone de Contacto (ex: +351960000000)", Icons.phone),
+              ),
+              const SizedBox(height: 15),
+
+              // COORDENADAS GPS
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _latController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration("Latitude", Icons.map_outlined),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lngController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration("Longitude", Icons.map_outlined),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 15),
 
@@ -165,20 +306,37 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
               TextFormField(
                 controller: _coverImageController,
                 style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: "URL da Imagem de Capa",
-                  labelStyle: const TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
+                decoration: _buildInputDecoration("URL da Imagem de Capa", Icons.image),
               ),
 
               const SizedBox(height: 30),
-              _buildSectionTitle("Cor do Tema da Loja"),
+              _buildSectionTitle("Horário de Funcionamento"),
               const SizedBox(height: 15),
 
-              // PALETA DE CORES
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _openTimeController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration("Hora de Abertura", Icons.access_time),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _closeTimeController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration("Hora de Fecho", Icons.access_time_filled),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+              _buildSectionTitle("Cor da Identidade Visual"),
+              const SizedBox(height: 15),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: _availableColors.map((colorVal) {
@@ -202,7 +360,7 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
                 }).toList(),
               ),
 
-              const SizedBox(height: 50),
+              const SizedBox(height: 40),
 
               // BOTÃO GUARDAR
               SizedBox(
@@ -224,11 +382,22 @@ class _ShopEditScreenState extends State<ShopEditScreen> {
                       : const Text("GUARDAR ALTERAÇÕES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.grey),
+      prefixIcon: Icon(icon, color: Colors.grey, size: 20),
+      filled: true,
+      fillColor: AppColors.surface,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
     );
   }
 
