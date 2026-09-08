@@ -4,11 +4,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../models/business_model.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/shop_service.dart';
+import '../services/eventify_service.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
 import 'notifications_screen.dart';
@@ -115,6 +117,7 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
   ];
 
   late Future<List<dynamic>> _promosFuture;
+  late Future<List<Map<String, dynamic>>> _eventsFuture;
   late Future<List<dynamic>> _topWorkersFuture;
 
   @override
@@ -125,6 +128,7 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
 
   void _loadDynamicData() {
     _promosFuture = _fetchActivePromotions();
+    _eventsFuture = EventifyService.getEvents();
     _topWorkersFuture = _fetchTopWorkers();
   }
 
@@ -148,6 +152,142 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
     return [];
   }
 
+  void _showEventDetails(Map<String, dynamic> ev, Color themeColor) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                ev['banner_url'],
+                height: 190,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(
+                  height: 190,
+                  color: Colors.grey[900],
+                  child: const Icon(Icons.festival, color: Colors.grey, size: 50),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    ev['title'] ?? 'Evento Parceiro',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: themeColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: themeColor.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    "EVENTIFY",
+                    style: TextStyle(
+                      color: themeColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: Colors.grey, size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  ev['location'],
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.calendar_today, color: Colors.grey, size: 15),
+                const SizedBox(width: 4),
+                Text(
+                  ev['date'],
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Entrada: ${ev['price']}€",
+              style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const Divider(color: Colors.white12, height: 26),
+            Text(
+              ev['description'] ?? '',
+              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 25),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: themeColor),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      final url = Uri.parse(ev['download_url'] ?? '');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: Icon(Icons.download_rounded, color: themeColor),
+                    label: Text("Descarregar Info", style: TextStyle(color: themeColor)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      final url = Uri.parse(ev['ticket_url'] ?? '');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.confirmation_number_outlined, size: 18),
+                    label: const Text("Ver Bilhetes", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -157,6 +297,8 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final app = Provider.of<AppProvider>(context);
+    final themeColor = app.getThemeColor();
     final isStaff = auth.isOwner || auth.isWorker;
 
     final userPhoto = auth.userModel?.name.isNotEmpty == true
@@ -424,7 +566,125 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
                 },
               ),
 
-              // 2. PROFISSIONAIS REAIS DA EQUIPA (PostgreSQL)
+              // 2. INTEGRAÇÃO EVENTIFY (Lê direto do Firestore)
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: _eventsFuture,
+                builder: (context, snapshot) {
+                  final events = snapshot.data ?? [];
+                  if (events.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.festival_outlined, color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Eventos em Parceria",
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              "Eventify Hub",
+                              style: TextStyle(
+                                color: themeColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 155,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: events.length,
+                          itemBuilder: (context, index) {
+                            final ev = events[index];
+                            return GestureDetector(
+                              onTap: () => _showEventDetails(ev, themeColor),
+                              child: Container(
+                                width: 280,
+                                margin: const EdgeInsets.only(right: 14),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  image: DecorationImage(
+                                    image: NetworkImage(ev['banner_url']),
+                                    fit: BoxFit.cover,
+                                    colorFilter: ColorFilter.mode(
+                                      Colors.black.withValues(alpha: 0.55),
+                                      BlendMode.darken,
+                                    ),
+                                  ),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: themeColor,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        ev['category'].toString().toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      ev['title'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      "📍 ${ev['location']} • ${ev['date']}",
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ).animate().fadeIn(delay: (60 * index).ms).slideX(begin: 0.1, end: 0);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                    ],
+                  );
+                },
+              ),
+
+              // 3. PROFISSIONAIS REAIS DA EQUIPA (PostgreSQL)
               FutureBuilder<List<dynamic>>(
                 future: _topWorkersFuture,
                 builder: (context, snapshot) {
@@ -503,7 +763,7 @@ class _ClientHomeFeedState extends State<_ClientHomeFeed> {
                 },
               ),
 
-              // 3. LISTA DE LOJAS DO POSTGRESQL
+              // 4. LISTA DE LOJAS DO POSTGRESQL
               FutureBuilder<List<Map<String, dynamic>>>(
                 future: ShopService.getShops(),
                 builder: (context, snapshot) {

@@ -1,9 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'config/theme.dart';
+import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 
@@ -34,7 +36,13 @@ void main() async {
 
   await Hive.initFlutter();
   await initializeDateFormatting('pt_PT', null);
+// 1. Obrigatório antes de qualquer plugin assíncrono
+  WidgetsFlutterBinding.ensureInitialized();
 
+  // 2. Inicializar o Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(
     MultiProvider(
       providers: [
